@@ -217,6 +217,21 @@ class ResponsesTranslator:
         if item_type == "reasoning":
             return None
 
+        # Responses API function_call → Chat Completions assistant message with tool_calls
+        if item_type == "function_call":
+            return {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": item.get("call_id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": item.get("name", ""),
+                        "arguments": item.get("arguments", ""),
+                    },
+                }],
+            }
+
         # Responses API function_call_output → Chat Completions tool message
         if item_type == "function_call_output":
             return {
