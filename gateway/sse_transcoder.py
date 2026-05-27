@@ -6,9 +6,6 @@ Chat Completions SSE format:
 Responses API SSE format:
   event: response.output_text.delta
   data: {"type":"response.output_text.delta","delta":"...","item_id":"...","content_index":0}
-
-State machine flow:
-  INITIAL → RESPONSE_STARTED → MESSAGE_OPEN → CONTENT_PART_OPEN / FUNCTION_CALL_OPEN → COMPLETED
 """
 
 import json
@@ -33,7 +30,6 @@ class SSETranscoder:
         self._sent_content_part = False
         self._current_reasoning = ""
         self._tool_calls: list[dict] = []
-        self._tool_call_items_sent = False
         self._finish_reason = ""
         self._usage: dict = {}
 
@@ -45,13 +41,15 @@ class SSETranscoder:
                     continue
                 data_str = line[6:].strip()
                 if data_str == "[DONE]":
-                    yield from self._handle_done()
+                    for event in self._handle_done():
+                        yield event
                     continue
                 try:
                     chunk = json.loads(data_str)
                 except json.JSONDecodeError:
                     continue
-                yield from self._process_chunk(chunk)
+                for event in self._process_chunk(chunk):
+                    yield event
         except Exception as e:
             yield self._sse_event("response.failed", {
                 "type": "response.failed",
@@ -62,14 +60,12 @@ class SSETranscoder:
                 },
             })
 
-    def _process_chunk(self, chunk: dict):
-        """Dispatch one Chat Completions chunk to the right handler."""
+    def _process_chunk(self, chunk: dict) -> list[str]:
+        """Dispatch one Chat Completions chunk to the right handler. Returns list of SSE strings."""
         choices = chunk.get("choices") or []
         if not choices:
-            # Usage-only chunk (some providers send final chunk with usage)
             if "usage" in chunk:
                 self._usage = chunk["usage"]
-                return []
             return []
 
         delta = choices[0].get("delta", {})
@@ -79,16 +75,13 @@ class SSETranscoder:
 
         events: list[str] = []
 
-        # Role chunk (first chunk with role=assistant)
         if delta.get("role") == "assistant" and not self._sent_created:
-            events = self._emit_response_start()
+            events.extend(self._emit_response_start())
 
-        # Reasoning content
         reasoning = delta.get("reasoning_content", "")
         if reasoning:
             events.extend(self._emit_reasoning(reasoning))
 
-        # Text content
         content = delta.get("content")
         if content:
             if not self._sent_message_item:
@@ -103,18 +96,16 @@ class SSETranscoder:
                 "delta": content,
             }))
 
-        # Tool calls
         tc_deltas = delta.get("tool_calls")
         if tc_deltas:
             events.extend(self._emit_tool_calls(tc_deltas))
 
-        # Finish
         if finish_reason:
             events.extend(self._emit_finish())
 
         return events
 
-    def _emit_response_start(self):
+    def _emit_response_start(self) -> list[str]:
         self._sent_created = True
         self._state = "RESPONSE_STARTED"
         now = int(time.time())
@@ -122,13 +113,9 @@ class SSETranscoder:
             self._sse_event("response.created", {
                 "type": "response.created",
                 "response": {
-                    "id": self._response_id,
-                    "object": "response",
-                    "status": "in_progress",
-                    "model": self._model,
-                    "output": [],
-                    "usage": None,
-                    "created_at": now,
+                    "id": self._response_id, "object": "response",
+                    "status": "in_progress", "model": self._model,
+                    "output": [], "usage": None, "created_at": now,
                 },
             }),
             self._sse_event("response.in_progress", {
@@ -137,7 +124,7 @@ class SSETranscoder:
             }),
         ]
 
-    def _emit_message_item(self):
+    def _emit_message_item(self) -> list[str]:
         self._sent_message_item = True
         self._state = "MESSAGE_OPEN"
         self._content_index = 0
@@ -145,45 +132,30 @@ class SSETranscoder:
             self._sse_event("response.output_item.added", {
                 "type": "response.output_item.added",
                 "item": {
-                    "id": self._msg_id,
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "in_progress",
-                    "content": [],
+                    "id": self._msg_id, "type": "message",
+                    "role": "assistant", "status": "in_progress", "content": [],
                 },
             }),
         ]
 
-    def _emit_content_part(self, part_type: str = "output_text"):
+    def _emit_content_part(self, part_type: str = "output_text") -> list[str]:
         self._sent_content_part = True
         self._state = "CONTENT_PART_OPEN"
-        if part_type == "output_text":
-            return [
-                self._sse_event("response.content_part.added", {
-                    "type": "response.content_part.added",
-                    "part": {"type": "output_text", "text": ""},
-                }),
-            ]
-        else:
-            return [
-                self._sse_event("response.content_part.added", {
-                    "type": "response.content_part.added",
-                    "part": {"type": "reasoning_summary_text", "text": ""},
-                }),
-            ]
+        ptype = "output_text" if part_type == "output_text" else "reasoning_summary_text"
+        return [
+            self._sse_event("response.content_part.added", {
+                "type": "response.content_part.added",
+                "part": {"type": ptype, "text": ""},
+            }),
+        ]
 
-    def _emit_reasoning(self, reasoning: str):
+    def _emit_reasoning(self, reasoning: str) -> list[str]:
         events: list[str] = []
         if not self._current_reasoning:
-            # First reasoning chunk — emit reasoning output_item
             self._rs_id = f"rs_{uuid.uuid4().hex[:8]}"
             events.append(self._sse_event("response.output_item.added", {
                 "type": "response.output_item.added",
-                "item": {
-                    "id": self._rs_id,
-                    "type": "reasoning",
-                    "status": "in_progress",
-                },
+                "item": {"id": self._rs_id, "type": "reasoning", "status": "in_progress"},
             }))
             events.append(self._sse_event("response.content_part.added", {
                 "type": "response.content_part.added",
@@ -192,61 +164,50 @@ class SSETranscoder:
         self._current_reasoning += reasoning
         events.append(self._sse_event("response.reasoning_summary_text.delta", {
             "type": "response.reasoning_summary_text.delta",
-            "item_id": self._rs_id,
-            "content_index": 0,
-            "delta": reasoning,
+            "item_id": self._rs_id, "content_index": 0, "delta": reasoning,
         }))
         return events
 
-    def _emit_tool_calls(self, tc_deltas: list[dict]):
+    def _emit_tool_calls(self, tc_deltas: list[dict]) -> list[str]:
         events: list[str] = []
-        # If we were in text mode, close text part + message item
         if self._state == "CONTENT_PART_OPEN":
-            events.append(self._sse_event("response.output_text.done", {
-                "type": "response.output_text.done",
-                "item_id": self._msg_id,
-                "content_index": self._content_index,
-                "text": self._text_buffer,
-            }))
-            events.append(self._sse_event("response.content_part.done", {
-                "type": "response.content_part.done",
-                "item_id": self._msg_id,
-                "content_index": self._content_index,
-                "part": {"type": "output_text", "text": self._text_buffer},
-            }))
-            events.append(self._sse_event("response.output_item.done", {
-                "type": "response.output_item.done",
-                "item": {
-                    "id": self._msg_id,
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "completed",
-                    "content": [{"type": "output_text", "text": self._text_buffer, "annotations": []}],
-                },
-            }))
+            events.extend([
+                self._sse_event("response.output_text.done", {
+                    "type": "response.output_text.done",
+                    "item_id": self._msg_id, "content_index": self._content_index,
+                    "text": self._text_buffer,
+                }),
+                self._sse_event("response.content_part.done", {
+                    "type": "response.content_part.done",
+                    "item_id": self._msg_id, "content_index": self._content_index,
+                    "part": {"type": "output_text", "text": self._text_buffer},
+                }),
+                self._sse_event("response.output_item.done", {
+                    "type": "response.output_item.done",
+                    "item": {
+                        "id": self._msg_id, "type": "message", "role": "assistant",
+                        "status": "completed",
+                        "content": [{"type": "output_text", "text": self._text_buffer, "annotations": []}],
+                    },
+                }),
+            ])
 
         for tc_delta in tc_deltas:
             idx = tc_delta.get("index", 0)
-            # Ensure tool_calls list is big enough
             while len(self._tool_calls) <= idx:
                 self._tool_calls.append({"id": "", "name": "", "arguments": ""})
-
             if "id" in tc_delta and tc_delta["id"]:
                 self._tool_calls[idx]["id"] = tc_delta["id"]
             func = tc_delta.get("function", {})
             if "name" in func and func["name"]:
                 self._tool_calls[idx]["name"] = func["name"]
-                # Emit function_call output_item
                 call_id = self._tool_calls[idx]["id"] or f"call_{uuid.uuid4().hex[:8]}"
                 events.append(self._sse_event("response.output_item.added", {
                     "type": "response.output_item.added",
                     "item": {
-                        "id": call_id,
-                        "type": "function_call",
-                        "name": func["name"],
-                        "call_id": call_id,
-                        "arguments": "",
-                        "status": "in_progress",
+                        "id": call_id, "type": "function_call",
+                        "name": func["name"], "call_id": call_id,
+                        "arguments": "", "status": "in_progress",
                     },
                 }))
             if "arguments" in func:
@@ -254,102 +215,87 @@ class SSETranscoder:
                 call_id = self._tool_calls[idx]["id"] or f"call_{uuid.uuid4().hex[:8]}"
                 events.append(self._sse_event("response.function_call_arguments.delta", {
                     "type": "response.function_call_arguments.delta",
-                    "item_id": call_id,
-                    "delta": func["arguments"],
+                    "item_id": call_id, "delta": func["arguments"],
                 }))
 
         self._state = "FUNCTION_CALL_OPEN"
         return events
 
-    def _emit_finish(self):
+    def _emit_finish(self) -> list[str]:
         events: list[str] = []
 
-        # Close any open content part
         if self._state == "CONTENT_PART_OPEN":
-            events.append(self._sse_event("response.output_text.done", {
-                "type": "response.output_text.done",
-                "item_id": self._msg_id,
-                "content_index": self._content_index,
-                "text": self._text_buffer,
-            }))
-            events.append(self._sse_event("response.content_part.done", {
-                "type": "response.content_part.done",
-                "item_id": self._msg_id,
-                "content_index": self._content_index,
-                "part": {"type": "output_text", "text": self._text_buffer},
-            }))
-            events.append(self._sse_event("response.output_item.done", {
-                "type": "response.output_item.done",
-                "item": {
-                    "id": self._msg_id,
-                    "type": "message",
-                    "role": "assistant",
-                    "status": "completed",
-                    "content": [{"type": "output_text", "text": self._text_buffer, "annotations": []}],
-                },
-            }))
+            events.extend([
+                self._sse_event("response.output_text.done", {
+                    "type": "response.output_text.done",
+                    "item_id": self._msg_id, "content_index": self._content_index,
+                    "text": self._text_buffer,
+                }),
+                self._sse_event("response.content_part.done", {
+                    "type": "response.content_part.done",
+                    "item_id": self._msg_id, "content_index": self._content_index,
+                    "part": {"type": "output_text", "text": self._text_buffer},
+                }),
+                self._sse_event("response.output_item.done", {
+                    "type": "response.output_item.done",
+                    "item": {
+                        "id": self._msg_id, "type": "message", "role": "assistant",
+                        "status": "completed",
+                        "content": [{"type": "output_text", "text": self._text_buffer, "annotations": []}],
+                    },
+                }),
+            ])
 
-        # Close reasoning item
         if self._current_reasoning:
-            events.append(self._sse_event("response.reasoning_summary_text.done", {
-                "type": "response.reasoning_summary_text.done",
-                "item_id": self._rs_id,
-                "content_index": 0,
-                "text": self._current_reasoning,
-            }))
-            events.append(self._sse_event("response.content_part.done", {
-                "type": "response.content_part.done",
-                "item_id": self._rs_id,
-                "content_index": 0,
-                "part": {"type": "reasoning_summary_text", "text": self._current_reasoning},
-            }))
-            events.append(self._sse_event("response.output_item.done", {
-                "type": "response.output_item.done",
-                "item": {
-                    "id": self._rs_id,
-                    "type": "reasoning",
-                    "status": "completed",
-                    "summary": [{"type": "summary_text", "text": self._current_reasoning}],
-                    "encrypted_content": self._current_reasoning,
-                },
-            }))
+            events.extend([
+                self._sse_event("response.reasoning_summary_text.done", {
+                    "type": "response.reasoning_summary_text.done",
+                    "item_id": self._rs_id, "content_index": 0,
+                    "text": self._current_reasoning,
+                }),
+                self._sse_event("response.content_part.done", {
+                    "type": "response.content_part.done",
+                    "item_id": self._rs_id, "content_index": 0,
+                    "part": {"type": "reasoning_summary_text", "text": self._current_reasoning},
+                }),
+                self._sse_event("response.output_item.done", {
+                    "type": "response.output_item.done",
+                    "item": {
+                        "id": self._rs_id, "type": "reasoning", "status": "completed",
+                        "summary": [{"type": "summary_text", "text": self._current_reasoning}],
+                        "encrypted_content": self._current_reasoning,
+                    },
+                }),
+            ])
 
-        # Close function_call items
         for tc in self._tool_calls:
             call_id = tc["id"] or f"call_{uuid.uuid4().hex[:8]}"
-            events.append(self._sse_event("response.function_call_arguments.done", {
-                "type": "response.function_call_arguments.done",
-                "item_id": call_id,
-                "arguments": tc["arguments"],
-            }))
-            events.append(self._sse_event("response.output_item.done", {
-                "type": "response.output_item.done",
-                "item": {
-                    "id": call_id,
-                    "type": "function_call",
-                    "name": tc["name"],
-                    "call_id": call_id,
-                    "arguments": tc["arguments"],
-                    "status": "completed",
-                },
-            }))
+            events.extend([
+                self._sse_event("response.function_call_arguments.done", {
+                    "type": "response.function_call_arguments.done",
+                    "item_id": call_id, "arguments": tc["arguments"],
+                }),
+                self._sse_event("response.output_item.done", {
+                    "type": "response.output_item.done",
+                    "item": {
+                        "id": call_id, "type": "function_call",
+                        "name": tc["name"], "call_id": call_id,
+                        "arguments": tc["arguments"], "status": "completed",
+                    },
+                }),
+            ])
 
-        # response.completed
         self._state = "COMPLETED"
         events.append(self._sse_event("response.completed", {
             "type": "response.completed",
             "response": {
-                "id": self._response_id,
-                "object": "response",
-                "status": "completed",
-                "model": self._model,
-                "usage": self._usage,
+                "id": self._response_id, "object": "response",
+                "status": "completed", "model": self._model, "usage": self._usage,
             },
         }))
         return events
 
-    def _handle_done(self):
-        # [DONE] marker received — ensure finish emitted if not yet
+    def _handle_done(self) -> list[str]:
         if self._state != "COMPLETED":
             if not self._finish_reason:
                 self._finish_reason = "stop"
@@ -357,8 +303,5 @@ class SSETranscoder:
         return []
 
     def _sse_event(self, event_type: str, data: dict) -> str:
-        """Build one SSE event string in Responses API format.
-        Note: type field is duplicated both in SSE 'event:' line and JSON data body.
-        """
         payload = json.dumps(data, ensure_ascii=False)
         return f"event: {event_type}\ndata: {payload}\n\n"

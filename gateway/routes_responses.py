@@ -54,14 +54,7 @@ async def proxy_responses(request: Request):
             chat_req, config.chat_completions_endpoint, config.deepseek_api_key
         )
         result = _translator.translate_nonstreaming_response(
-            upstream_json, body.get("model", "gpt-4o"), response_id
-        )
-        # Cache for previous_response_id support
-        _translator.cache.store(
-            response_id,
-            chat_req.get("messages", []),
-            body.get("model", "gpt-4o"),
-            upstream_json.get("usage", {}),
+            upstream_json, body, body.get("model", "gpt-4o"), response_id
         )
         rlog.finish(200)
         return JSONResponse(result)

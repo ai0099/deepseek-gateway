@@ -88,7 +88,11 @@ class ResponsesTranslator:
 
     # ── Response: Chat Completions → Responses API ──
 
-    def translate_nonstreaming_response(self, chat_resp: dict, model: str, response_id: str) -> dict:
+    def translate_nonstreaming_response(
+        self, chat_resp: dict, req_body: dict, model: str, response_id: str
+    ) -> dict:
+        """Translate Chat Completions response → Responses API format.
+        req_body is the original Responses API request (used for caching)."""
         choice = (chat_resp.get("choices") or [{}])[0]
         message = choice.get("message", {})
         output: list[dict] = []
@@ -133,12 +137,12 @@ class ResponsesTranslator:
                 "status": "completed",
             })
 
-        # Cache this response
-        flat_messages = []
-        for item in (req.get("input") if isinstance(req.get("input"), list) else []):
-            flat_messages.append(self._convert_input_item(item))
+        # Cache for previous_response_id support
+        input_items = req_body.get("input") if isinstance(req_body.get("input"), list) else []
+        flat_messages = [msg for item in input_items if (msg := self._convert_input_item(item))]
         if output:
             flat_messages.append({"role": "assistant", "content": content_text, "tool_calls": message.get("tool_calls")})
+        self.cache.store(response_id, flat_messages, model, chat_resp.get("usage", {}))
 
         return {
             "id": response_id,
