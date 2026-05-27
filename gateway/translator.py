@@ -70,6 +70,8 @@ class ResponsesTranslator:
             "model": upstream_model,
             "messages": messages,
             "stream": req.get("stream", False),
+            # Enable DeepSeek thinking/reasoning mode
+            "thinking": {"type": "enabled"},
         }
         if tools:
             chat_req["tools"] = tools

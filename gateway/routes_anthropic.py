@@ -80,10 +80,7 @@ async def _sse_masquerade(upstream_resp, mapper):
 
 
 def _clean_anthropic_body(body: dict):
-    """Remove fields DeepSeek doesn't understand; apply safe limits."""
-    body.pop("thinking", None)
-    body.pop("budget_tokens", None)
-
+    """Apply safe limits. thinking/budget_tokens passed through for DeepSeek reasoning."""
     if body.get("max_tokens", 0) > MAX_OUTPUT_TOKENS:
         body["max_tokens"] = MAX_OUTPUT_TOKENS
 
