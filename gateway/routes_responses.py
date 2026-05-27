@@ -51,7 +51,7 @@ async def proxy_responses(request: Request):
             }, status_code=502)
 
         from .sse_transcoder import SSETranscoder
-        transcoder = SSETranscoder(body.get("model", "gpt-5.5"), response_id)
+        transcoder = SSETranscoder(body.get("model", "gpt-5.5"), response_id, body)
 
         async def cached_stream():
             async for event in transcoder.transcode_stream(upstream_resp):

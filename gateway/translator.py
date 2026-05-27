@@ -54,10 +54,29 @@ class ResponsesTranslator:
         if isinstance(input_data, str):
             messages.append({"role": "user", "content": input_data})
         elif isinstance(input_data, list):
+            pending_reasoning = ""
             for item in input_data:
                 msg = self._convert_input_item(item)
-                if msg:
-                    messages.append(msg)
+                if msg is None:
+                    # Track reasoning content for cross-turn continuity
+                    if isinstance(item, dict) and item.get("type") == "reasoning":
+                        pending_reasoning = item.get("encrypted_content", "") or "".join(
+                            s.get("text", "") for s in (item.get("summary") or [])
+                        )
+                    continue
+                # Attach pending reasoning to assistant messages with tool_calls
+                if pending_reasoning and msg.get("role") == "assistant" and msg.get("tool_calls"):
+                    msg["reasoning_content"] = pending_reasoning
+                    pending_reasoning = ""
+                # Attach pending reasoning to the last assistant message if it's the first user/tool msg
+                if pending_reasoning and msg.get("role") in ("user", "tool"):
+                    # Inject reasoning into the previous assistant message in the list
+                    for m in reversed(messages):
+                        if m.get("role") == "assistant":
+                            m["reasoning_content"] = pending_reasoning
+                            break
+                    pending_reasoning = ""
+                messages.append(msg)
 
         # tools → Chat Completions tools (filter function type only)
         tools = self._convert_tools(req.get("tools"))
@@ -155,8 +174,36 @@ class ResponsesTranslator:
             "status": "completed",
             "model": model,
             "output": output,
-            "usage": chat_resp.get("usage"),
+            "usage": self._map_usage(chat_resp.get("usage")),
+            "parallel_tool_calls": req_body.get("parallel_tool_calls", True),
+            "tool_choice": req_body.get("tool_choice", "auto"),
+            "reasoning": req_body.get("reasoning", {"effort": None, "summary": None}),
+            "text": req_body.get("text", {"format": {"type": "text"}}),
+            "incomplete_details": None,
+            "error": None,
+            "metadata": req_body.get("metadata", {}),
+            "previous_response_id": req_body.get("previous_response_id"),
+            "instructions": req_body.get("instructions"),
+            "temperature": req_body.get("temperature"),
+            "top_p": req_body.get("top_p"),
+            "max_output_tokens": req_body.get("max_output_tokens"),
+            "tools": req_body.get("tools", []),
+            "truncation": "disabled",
         }
+
+    def _map_usage(self, usage: dict | None) -> dict | None:
+        if not usage:
+            return None
+        result = {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        }
+        if "prompt_tokens_details" in usage:
+            result["input_tokens_details"] = usage["prompt_tokens_details"]
+        if "completion_tokens_details" in usage:
+            result["output_tokens_details"] = usage["completion_tokens_details"]
+        return result
 
     # ── Helpers ──
 

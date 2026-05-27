@@ -14,9 +14,10 @@ import time
 
 
 class SSETranscoder:
-    def __init__(self, client_model: str, response_id: str = ""):
+    def __init__(self, client_model: str, response_id: str = "", req_body: dict | None = None):
         self._model = client_model
         self._response_id = response_id or f"resp_{uuid.uuid4().hex[:12]}"
+        self._req_body = req_body or {}
         self._reset()
         # Accumulated full response for cross-turn caching
         self.full_text = ""
@@ -323,12 +324,31 @@ class SSETranscoder:
             ])
 
         self._state = "COMPLETED"
+        res_obj = {
+            "id": self._response_id,
+            "object": "response",
+            "status": "completed" if self._finish_reason != "length" else "incomplete",
+            "model": self._model,
+            "output": [],  # Will be reconstructed by Codex from events
+            "usage": self._map_usage_sse(self.usage),
+            "parallel_tool_calls": self._req_body.get("parallel_tool_calls", True),
+            "tool_choice": self._req_body.get("tool_choice", "auto"),
+            "reasoning": self._req_body.get("reasoning", {"effort": None, "summary": None}),
+            "text": self._req_body.get("text", {"format": {"type": "text"}}),
+            "incomplete_details": {"reason": "max_output_tokens"} if self._finish_reason == "length" else None,
+            "error": None,
+            "metadata": self._req_body.get("metadata", {}),
+            "previous_response_id": self._req_body.get("previous_response_id"),
+            "instructions": self._req_body.get("instructions"),
+            "temperature": self._req_body.get("temperature"),
+            "top_p": self._req_body.get("top_p"),
+            "max_output_tokens": self._req_body.get("max_output_tokens"),
+            "tools": self._req_body.get("tools", []),
+            "truncation": "disabled",
+        }
         events.append(self._sse_event("response.completed", {
             "type": "response.completed",
-            "response": {
-                "id": self._response_id, "object": "response",
-                "status": "completed", "model": self._model, "usage": self._usage,
-            },
+            "response": res_obj,
         }))
         return events
 
@@ -338,6 +358,20 @@ class SSETranscoder:
                 self._finish_reason = "stop"
             return self._emit_finish()
         return []
+
+    def _map_usage_sse(self, usage: dict | None) -> dict | None:
+        if not usage:
+            return None
+        result = {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        }
+        if "prompt_tokens_details" in usage:
+            result["input_tokens_details"] = usage["prompt_tokens_details"]
+        if "completion_tokens_details" in usage:
+            result["output_tokens_details"] = usage["completion_tokens_details"]
+        return result
 
     def _sse_event(self, event_type: str, data: dict) -> str:
         payload = json.dumps(data, ensure_ascii=False)
