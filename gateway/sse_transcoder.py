@@ -35,6 +35,23 @@ class SSETranscoder:
 
     async def transcode_stream(self, upstream_resp):
         """Read Chat Completions SSE from upstream, yield Responses API SSE events."""
+        # Check for upstream HTTP errors before streaming
+        if upstream_resp.status_code >= 400:
+            try:
+                error_body = await upstream_resp.aread()
+                error_text = error_body.decode("utf-8", errors="replace")[:500]
+            except Exception:
+                error_text = f"HTTP {upstream_resp.status_code}"
+            yield self._sse_event("response.failed", {
+                "type": "response.failed",
+                "response": {
+                    "id": self._response_id,
+                    "status": "failed",
+                    "error": {"message": error_text},
+                },
+            })
+            return
+
         try:
             async for line in upstream_resp.aiter_lines():
                 if not line.startswith("data: ") or len(line) < 7:
@@ -43,7 +60,7 @@ class SSETranscoder:
                 if data_str == "[DONE]":
                     for event in self._handle_done():
                         yield event
-                    continue
+                    break
                 try:
                     chunk = json.loads(data_str)
                 except json.JSONDecodeError:
@@ -59,6 +76,13 @@ class SSETranscoder:
                     "error": {"message": str(e)},
                 },
             })
+
+        # Always emit completed if not already done (stream dropped, etc.)
+        if self._state != "COMPLETED":
+            if not self._finish_reason:
+                self._finish_reason = "stop"
+            for event in self._emit_finish():
+                yield event
 
     def _process_chunk(self, chunk: dict) -> list[str]:
         """Dispatch one Chat Completions chunk to the right handler. Returns list of SSE strings."""
