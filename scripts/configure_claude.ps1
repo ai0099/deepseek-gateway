@@ -13,11 +13,12 @@ Write-Host ""
 
 # --- Find Claude Desktop config directory ---
 $possiblePaths = @(
+    "$env:LOCALAPPDATA\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude",
+    "$env:LOCALAPPDATA\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude-3p",
     "$env:APPDATA\Claude-3p",
     "$env:LOCALAPPDATA\Claude-3p",
     "$env:APPDATA\Claude",
-    "$env:LOCALAPPDATA\Claude",
-    "$env:LOCALAPPDATA\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude-3p"
+    "$env:LOCALAPPDATA\Claude"
 )
 
 $configRoot = $null

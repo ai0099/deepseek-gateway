@@ -86,6 +86,7 @@ class ResponsesTranslator:
         upstream_model = self._mapper.resolve_responses(client_model)
 
         # Post-process: move system messages that interrupt tool call sequences
+        messages = self._merge_consecutive_tool_calls(messages)
         messages = self._fix_tool_call_continuity(messages)
 
         chat_req = {
@@ -107,6 +108,24 @@ class ResponsesTranslator:
             chat_req["top_p"] = req["top_p"]
 
         return chat_req, response_id
+
+    def _merge_consecutive_tool_calls(self, messages: list[dict]) -> list[dict]:
+        """Merge consecutive assistant(tool_calls) messages into one with multiple tool_calls.
+        DeepSeek API rejects consecutive assistant tool_calls messages that aren't
+        separated by their corresponding tool responses."""
+        result: list[dict] = []
+        for msg in messages:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                if result and result[-1].get("role") == "assistant" and result[-1].get("tool_calls"):
+                    # Merge tool_calls into the previous assistant message
+                    result[-1]["tool_calls"].extend(msg["tool_calls"])
+                    # Merge reasoning_content if present
+                    if msg.get("reasoning_content"):
+                        existing = result[-1].get("reasoning_content", "")
+                        result[-1]["reasoning_content"] = existing + "\n" + msg["reasoning_content"]
+                    continue
+            result.append(msg)
+        return result
 
     def _fix_tool_call_continuity(self, messages: list[dict]) -> list[dict]:
         """Move system/developer messages that appear between an assistant
