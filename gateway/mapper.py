@@ -4,6 +4,12 @@ Claude model names (client-visible) and DeepSeek model names (upstream)."""
 from .config import load_config
 
 
+def _strip_suffix(model_name: str) -> str:
+    """Strip context-window suffixes like [1m] from model names."""
+    bracket = model_name.find("[")
+    return model_name[:bracket] if bracket != -1 else model_name
+
+
 class ModelMapper:
     def __init__(self):
         config = load_config()
@@ -13,9 +19,10 @@ class ModelMapper:
         self._reverse: dict[str, str] = {}
         seen: set[str] = set()
         for claude_name, ds_name in self._slot_map.items():
-            if ds_name not in seen:
-                self._reverse[ds_name] = claude_name
-                seen.add(ds_name)
+            base = _strip_suffix(ds_name)
+            if base not in seen:
+                self._reverse[base] = claude_name
+                seen.add(base)
 
     # ── Anthropic (Claude Desktop / Claude Code) ──
 
@@ -37,18 +44,18 @@ class ModelMapper:
         return {"object": "list", "data": data}
 
     def resolve_anthropic(self, client_model: str) -> str:
-        """claude-sonnet-4-20250514 → deepseek-chat."""
-        return self._slot_map.get(client_model, self._slot_map.get(self.slot_names[0], "deepseek-chat"))
+        """claude-sonnet-4-20250514 → deepseek-v4-pro[1m]."""
+        return self._slot_map.get(client_model, self._slot_map.get(self.slot_names[0], "deepseek-v4-pro"))
 
     def reverse_anthropic(self, upstream_model: str) -> str:
-        """deepseek-chat → claude-sonnet-4-20250514 (first slot)."""
-        return self._reverse.get(upstream_model, self.slot_names[0])
+        """deepseek-v4-pro → claude-sonnet-4-20250514 (first slot). Strips [1m] suffix."""
+        return self._reverse.get(_strip_suffix(upstream_model), self.slot_names[0])
 
     # ── Responses API (Codex) ──
 
     def resolve_responses(self, client_model: str) -> str:
-        """gpt-4o → deepseek-chat. Falls back to first slot if unknown."""
-        return self._responses_map.get(client_model) or self._slot_map.get(self.slot_names[0], "deepseek-chat")
+        """gpt-5.5 → deepseek-v4-pro. Falls back to first slot if unknown."""
+        return self._responses_map.get(client_model) or self._slot_map.get(self.slot_names[0], "deepseek-v4-pro")
 
 
 # Singleton

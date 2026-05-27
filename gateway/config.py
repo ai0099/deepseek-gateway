@@ -17,31 +17,31 @@ class Settings(BaseSettings):
 
     # 8 Claude model slots → real DeepSeek models (for Claude Desktop masquerade)
     model_slots: dict = {
-        "claude-sonnet-4-20250514":    "deepseek-chat",
-        "claude-opus-4-20250514":      "deepseek-reasoner",
-        "claude-3-5-sonnet-20241022":  "deepseek-chat",
-        "claude-3-opus-20240229":      "deepseek-reasoner",
-        "claude-3-haiku-20240307":     "deepseek-chat",
-        "claude-3-5-haiku-20241022":   "deepseek-chat",
-        "claude-3-5-sonnet-20240620":  "deepseek-chat",
-        "claude-3-sonnet-20240229":    "deepseek-chat",
+        "claude-sonnet-4-20250514":    "deepseek-v4-pro[1m]",
+        "claude-opus-4-20250514":      "deepseek-v4-pro[1m]",
+        "claude-3-5-sonnet-20241022":  "deepseek-v4-pro[1m]",
+        "claude-3-opus-20240229":      "deepseek-v4-pro[1m]",
+        "claude-3-haiku-20240307":     "deepseek-v4-flash",
+        "claude-3-5-haiku-20241022":   "deepseek-v4-flash",
+        "claude-3-5-sonnet-20240620":  "deepseek-v4-pro[1m]",
+        "claude-3-sonnet-20240229":    "deepseek-v4-pro[1m]",
     }
 
     # Responses API model mapping (OpenAI model → DeepSeek model)
     responses_model_map: dict = {
-        "gpt-4o":                     "deepseek-chat",
-        "gpt-4o-mini":                "deepseek-chat",
-        "gpt-4.1":                    "deepseek-chat",
-        "gpt-4.1-mini":               "deepseek-chat",
-        "o1":                         "deepseek-reasoner",
-        "o3":                         "deepseek-reasoner",
-        "o3-mini":                    "deepseek-reasoner",
-        "o4-mini":                    "deepseek-reasoner",
-        "gpt-5":                      "deepseek-chat",
-        "gpt-5.4":                    "deepseek-chat",
-        "gpt-5.5":                    "deepseek-chat",
-        "computer-use-preview":       "deepseek-chat",
-        "gpt-4o-search-preview":      "deepseek-chat",
+        "gpt-4o":                     "deepseek-v4-pro",
+        "gpt-4o-mini":                "deepseek-v4-pro",
+        "gpt-4.1":                    "deepseek-v4-pro",
+        "gpt-4.1-mini":               "deepseek-v4-pro",
+        "o1":                         "deepseek-v4-pro",
+        "o3":                         "deepseek-v4-pro",
+        "o3-mini":                    "deepseek-v4-pro",
+        "o4-mini":                    "deepseek-v4-pro",
+        "gpt-5":                      "deepseek-v4-pro",
+        "gpt-5.4":                    "deepseek-v4-pro",
+        "gpt-5.5":                    "deepseek-v4-pro",
+        "computer-use-preview":       "deepseek-v4-pro",
+        "gpt-4o-search-preview":      "deepseek-v4-pro",
     }
 
     model_config = {"env_prefix": "DS_GW_", "env_file": ".env", "env_nested_delimiter": "__"}
