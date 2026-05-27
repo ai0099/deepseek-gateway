@@ -323,13 +323,33 @@ class SSETranscoder:
                 }),
             ])
 
+        # Build output items for response.completed
+        output_items = []
+        if self._current_reasoning:
+            output_items.append({
+                "id": self._rs_id, "type": "reasoning", "status": "completed",
+                "summary": [{"type": "summary_text", "text": self._current_reasoning}],
+                "encrypted_content": self._current_reasoning,
+            })
+        if self._text_buffer:
+            output_items.append({
+                "id": self._msg_id, "type": "message", "role": "assistant", "status": "completed",
+                "content": [{"type": "output_text", "text": self._text_buffer, "annotations": []}],
+            })
+        for tc in self._tool_calls:
+            output_items.append({
+                "id": tc["id"], "type": "function_call",
+                "call_id": tc["id"], "name": tc["name"],
+                "arguments": tc["arguments"], "status": "completed",
+            })
+
         self._state = "COMPLETED"
         res_obj = {
             "id": self._response_id,
             "object": "response",
             "status": "completed" if self._finish_reason != "length" else "incomplete",
             "model": self._model,
-            "output": [],  # Will be reconstructed by Codex from events
+            "output": output_items,
             "usage": self._map_usage_sse(self.usage),
             "parallel_tool_calls": self._req_body.get("parallel_tool_calls", True),
             "tool_choice": self._req_body.get("tool_choice", "auto"),
