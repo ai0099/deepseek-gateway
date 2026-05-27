@@ -35,6 +35,24 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Catch-all request logger
+    @app.middleware("http")
+    async def log_all_requests(request, call_next):
+        import os as _os, json as _json
+        _debug_log = _os.path.join(_os.path.dirname(__file__), '..', 'debug_requests.log')
+        try:
+            with open(_debug_log, 'a', encoding='utf-8') as _f:
+                _f.write(f"\n[MIDDLEWARE] {request.method} {request.url.path} from {request.client.host if request.client else '?'}\n")
+                if request.query_params:
+                    _f.write(f"  query: {dict(request.query_params)}\n")
+        except: pass
+        response = await call_next(request)
+        try:
+            with open(_debug_log, 'a', encoding='utf-8') as _f:
+                _f.write(f"  -> {response.status_code}\n")
+        except: pass
+        return response
+
     from .routes_models import router as models_router
     from .routes_anthropic import router as anthropic_router
     from .routes_responses import router as responses_router
