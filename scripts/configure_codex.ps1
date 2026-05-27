@@ -24,7 +24,7 @@ Write-Host "  Wrote: $authFile" -ForegroundColor Gray
 # --- Write config.toml ---
 $configFile = Join-Path $codexDir "config.toml"
 $tomlContent = @'
-# DeepSeek Gateway — Codex Configuration
+# DeepSeek Gateway -- Codex Configuration
 model = "gpt-5.5"
 model_provider = "deepseek-gateway"
 
@@ -36,14 +36,14 @@ requires_openai_auth = true
 request_max_retries = 1
 
 # Available models (comment/uncomment to switch):
-#   model = "gpt-5.4"       → deepseek-chat
-#   model = "o3"             → deepseek-reasoner
-#   model = "o1"             → deepseek-reasoner
-#   model = "gpt-4o"         → deepseek-chat
-#   model = "gpt-4o-mini"    → deepseek-chat
+#   model = "gpt-5.4"       # deepseek-chat
+#   model = "o3"             # deepseek-reasoner
+#   model = "o1"             # deepseek-reasoner
+#   model = "gpt-4o"         # deepseek-chat
+#   model = "gpt-4o-mini"    # deepseek-chat
 '@ -replace "{GATEWAY_URL}", $GatewayUrl
 
-Set-Content -Path $configFile -Value $tomlContent
+Set-Content -Path $configFile -Value $tomlContent -Encoding UTF8
 Write-Host "  Wrote: $configFile" -ForegroundColor Gray
 
 Write-Host ""
