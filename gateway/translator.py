@@ -141,7 +141,12 @@ class ResponsesTranslator:
         input_items = req_body.get("input") if isinstance(req_body.get("input"), list) else []
         flat_messages = [msg for item in input_items if (msg := self._convert_input_item(item))]
         if output:
-            flat_messages.append({"role": "assistant", "content": content_text, "tool_calls": message.get("tool_calls")})
+            assistant_msg: dict = {"role": "assistant", "content": content_text}
+            if message.get("tool_calls"):
+                assistant_msg["tool_calls"] = message["tool_calls"]
+            if reasoning:
+                assistant_msg["reasoning_content"] = reasoning
+            flat_messages.append(assistant_msg)
         self.cache.store(response_id, flat_messages, model, chat_resp.get("usage", {}))
 
         return {

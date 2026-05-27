@@ -53,8 +53,21 @@ async def proxy_responses(request: Request):
         from .sse_transcoder import SSETranscoder
         transcoder = SSETranscoder(body.get("model", "gpt-5.5"))
 
+        async def cached_stream():
+            async for event in transcoder.transcode_stream(upstream_resp):
+                yield event
+            # Cache the completed response for previous_response_id support
+            msgs = list(chat_req.get("messages", []))
+            assistant_msg = {"role": "assistant", "content": transcoder.full_text}
+            if transcoder.full_reasoning:
+                assistant_msg["reasoning_content"] = transcoder.full_reasoning
+            if transcoder.full_tool_calls:
+                assistant_msg["tool_calls"] = transcoder.full_tool_calls
+            msgs.append(assistant_msg)
+            _translator.cache.store(response_id, msgs, body.get("model", "gpt-5.5"), transcoder.usage)
+
         return StreamingResponse(
-            transcoder.transcode_stream(upstream_resp),
+            cached_stream(),
             media_type="text/event-stream",
             headers={
                 "cache-control": "no-cache",

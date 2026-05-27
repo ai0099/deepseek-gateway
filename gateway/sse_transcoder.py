@@ -17,6 +17,11 @@ class SSETranscoder:
     def __init__(self, client_model: str):
         self._model = client_model
         self._reset()
+        # Accumulated full response for cross-turn caching
+        self.full_text = ""
+        self.full_reasoning = ""
+        self.full_tool_calls: list[dict] = []
+        self.usage: dict = {}
 
     def _reset(self):
         self._response_id = f"resp_{uuid.uuid4().hex[:12]}"
@@ -90,6 +95,7 @@ class SSETranscoder:
         if not choices:
             if "usage" in chunk:
                 self._usage = chunk["usage"]
+                self.usage = chunk["usage"]
             return []
 
         delta = choices[0].get("delta", {})
@@ -105,6 +111,7 @@ class SSETranscoder:
         reasoning = delta.get("reasoning_content", "")
         if reasoning:
             events.extend(self._emit_reasoning(reasoning))
+            self.full_reasoning += reasoning
 
         content = delta.get("content")
         if content:
@@ -113,6 +120,7 @@ class SSETranscoder:
             if not self._sent_content_part:
                 events.extend(self._emit_content_part("output_text"))
             self._text_buffer += content
+            self.full_text += content
             events.append(self._sse_event("response.output_text.delta", {
                 "type": "response.output_text.delta",
                 "item_id": self._msg_id,
