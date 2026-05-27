@@ -63,7 +63,7 @@ class ResponsesTranslator:
         tools = self._convert_tools(req.get("tools"))
 
         # model resolution
-        client_model = req.get("model") or "gpt-4o"
+        client_model = req.get("model") or "gpt-5.5"
         upstream_model = self._mapper.resolve_responses(client_model)
 
         chat_req = {

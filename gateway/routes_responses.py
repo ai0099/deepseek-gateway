@@ -51,7 +51,7 @@ async def proxy_responses(request: Request):
             }, status_code=502)
 
         from .sse_transcoder import SSETranscoder
-        transcoder = SSETranscoder(body.get("model", "gpt-4o"))
+        transcoder = SSETranscoder(body.get("model", "gpt-5.5"))
 
         return StreamingResponse(
             transcoder.transcode_stream(upstream_resp),
@@ -67,7 +67,7 @@ async def proxy_responses(request: Request):
             chat_req, config.chat_completions_endpoint, config.deepseek_api_key
         )
         result = _translator.translate_nonstreaming_response(
-            upstream_json, body, body.get("model", "gpt-4o"), response_id
+            upstream_json, body, body.get("model", "gpt-5.5"), response_id
         )
         rlog.finish(200)
         return JSONResponse(result)
