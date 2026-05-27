@@ -30,6 +30,16 @@ async def proxy_anthropic(request: Request):
     body = await request.json()
     client_model = body.get("model", "")
     upstream_model = mapper.resolve_anthropic(client_model)
+
+    # Log Anthropic request
+    import os as _os
+    _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
+    try:
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"\n[ANTHROPIC] model={client_model} -> {upstream_model} stream={body.get('stream')} max_tokens={body.get('max_tokens')} msgs={len(body.get('messages',[]))}\n")
+            _f.write(f"  thinking={body.get('thinking','N/A')} budget_tokens={body.get('budget_tokens','N/A')}\n")
+    except: pass
+
     body["model"] = upstream_model
     rlog.model = client_model
     rlog.streaming = body.get("stream", False)
@@ -37,8 +47,15 @@ async def proxy_anthropic(request: Request):
     _clean_anthropic_body(body)
 
     if body.get("stream"):
-        upstream_resp = await stream_anthropic(body, f"{config.anthropic_endpoint}/v1/messages", config.deepseek_api_key)
-        rlog.finish(upstream_resp.status_code)
+        try:
+            upstream_resp = await stream_anthropic(body, f"{config.anthropic_endpoint}/v1/messages", config.deepseek_api_key)
+            rlog.finish(upstream_resp.status_code)
+        except Exception as _e:
+            try:
+                with open(_debug_log, 'a', encoding='utf-8') as _f:
+                    _f.write(f"  ANTHROPIC UPSTREAM ERROR: {_e}\n")
+            except: pass
+            return JSONResponse({"error": {"message": str(_e)}}, status_code=502)
         return StreamingResponse(
             _sse_masquerade(upstream_resp, mapper),
             media_type="text/event-stream",
@@ -48,8 +65,19 @@ async def proxy_anthropic(request: Request):
                 "x-accel-buffering": "no",
             },
         )
+        try:
+            with open(_debug_log, 'a', encoding='utf-8') as _f:
+                _f.write(f"  ANTHROPIC -> {upstream_resp.status_code} (streaming)\n")
+        except: pass
     else:
-        upstream_json = await post_anthropic_non_streaming(body, f"{config.anthropic_endpoint}/v1/messages", config.deepseek_api_key)
+        try:
+            upstream_json = await post_anthropic_non_streaming(body, f"{config.anthropic_endpoint}/v1/messages", config.deepseek_api_key)
+        except Exception as _e:
+            try:
+                with open(_debug_log, 'a', encoding='utf-8') as _f:
+                    _f.write(f"  ANTHROPIC UPSTREAM ERROR (non-streaming): {_e}\n")
+            except: pass
+            return JSONResponse({"error": {"message": str(_e)}}, status_code=502)
         if "model" in upstream_json:
             upstream_json["model"] = mapper.reverse_anthropic(upstream_json["model"])
         rlog.finish(200)
