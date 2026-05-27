@@ -85,6 +85,9 @@ class ResponsesTranslator:
         client_model = req.get("model") or "gpt-5.5"
         upstream_model = self._mapper.resolve_responses(client_model)
 
+        # Post-process: move system messages that interrupt tool call sequences
+        messages = self._fix_tool_call_continuity(messages)
+
         chat_req = {
             "model": upstream_model,
             "messages": messages,
@@ -104,6 +107,62 @@ class ResponsesTranslator:
             chat_req["top_p"] = req["top_p"]
 
         return chat_req, response_id
+
+    def _fix_tool_call_continuity(self, messages: list[dict]) -> list[dict]:
+        """Move system/developer messages that appear between an assistant
+        with tool_calls and its tool message responses, so DeepSeek doesn't
+        reject the tool call sequence."""
+        result: list[dict] = []
+        deferred_system: list[dict] = []
+        in_tool_sequence = False
+
+        for msg in messages:
+            is_assistant_tc = msg.get("role") == "assistant" and msg.get("tool_calls")
+            is_system = msg.get("role") == "system"
+            is_tool = msg.get("role") == "tool"
+
+            if is_assistant_tc:
+                result.append(msg)
+                in_tool_sequence = True
+                deferred_system = []
+                continue
+
+            if in_tool_sequence and is_system:
+                deferred_system.append(msg)
+                continue
+
+            if in_tool_sequence and is_tool:
+                result.append(msg)
+                continue
+
+            # End of tool sequence or other role
+            if in_tool_sequence and not is_tool:
+                # Flush any deferred system messages BEFORE the tool sequence
+                insert_pos = len(result)
+                for m in reversed(result):
+                    if m.get("role") == "assistant" and m.get("tool_calls"):
+                        insert_pos = result.index(m)
+                        break
+                for ds in deferred_system:
+                    result.insert(insert_pos, ds)
+                deferred_system = []
+                in_tool_sequence = False
+                result.append(msg)
+                continue
+
+            result.append(msg)
+
+        # Flush remaining deferred at end of tool sequence
+        if deferred_system:
+            insert_pos = len(result)
+            for m in reversed(result):
+                if m.get("role") == "assistant" and m.get("tool_calls"):
+                    insert_pos = result.index(m)
+                    break
+            for ds in deferred_system:
+                result.insert(insert_pos, ds)
+
+        return result
 
     # ── Response: Chat Completions → Responses API ──
 
