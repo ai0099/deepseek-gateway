@@ -27,10 +27,27 @@ async def proxy_responses(request: Request):
     rlog = RequestLog("POST", "/v1/responses", detect_client_type(request))
 
     body = await request.json()
+
+    # DEBUG: Log full request to file
+    import json as _json, os as _os
+    _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
+    try:
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"\n{'='*60}\n")
+            _f.write(f"TIME: {__import__('datetime').datetime.now().isoformat()}\n")
+            _f.write(f"REQUEST:\n{_json.dumps(body, ensure_ascii=False, indent=2)[:8000]}\n")
+    except: pass
+
     chat_req, response_id = _translator.translate_request(body)
+
+    # Log translated Chat Completions request
+    try:
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"TRANSLATED:\n{_json.dumps(chat_req, ensure_ascii=False, indent=2)[:8000]}\n")
+    except: pass
+
     rlog.model = chat_req.get("model", "-")
     rlog.streaming = chat_req.get("stream", False)
-    # Log key request details for debugging
     import logging
     _log = logging.getLogger("gateway")
     _log.info("Responses req: model=%s stream=%s tools=%s input_items=%s msgs=%s",
