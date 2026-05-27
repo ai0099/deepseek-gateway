@@ -44,7 +44,7 @@ class Settings(BaseSettings):
         "gpt-4o-search-preview":      "deepseek-chat",
     }
 
-    model_config = {"env_prefix": "DS_GW_", "env_nested_delimiter": "__"}
+    model_config = {"env_prefix": "DS_GW_", "env_file": ".env", "env_nested_delimiter": "__"}
 
     @property
     def anthropic_endpoint(self) -> str:
