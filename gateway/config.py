@@ -29,19 +29,11 @@ class Settings(BaseSettings):
 
     # Responses API model mapping (OpenAI model → DeepSeek model)
     responses_model_map: dict = {
-        "gpt-4o":                     "deepseek-v4-pro",
-        "gpt-4o-mini":                "deepseek-v4-pro",
-        "gpt-4.1":                    "deepseek-v4-pro",
-        "gpt-4.1-mini":               "deepseek-v4-pro",
-        "o1":                         "deepseek-v4-pro",
-        "o3":                         "deepseek-v4-pro",
-        "o3-mini":                    "deepseek-v4-pro",
-        "o4-mini":                    "deepseek-v4-pro",
-        "gpt-5":                      "deepseek-v4-pro",
-        "gpt-5.4":                    "deepseek-v4-pro",
         "gpt-5.5":                    "deepseek-v4-pro",
-        "computer-use-preview":       "deepseek-v4-pro",
-        "gpt-4o-search-preview":      "deepseek-v4-pro",
+        "gpt-5.4":                    "deepseek-v4-pro",
+        "gpt-5.4-mini":               "deepseek-v4-flash",
+        "gpt-5.3-codex":              "deepseek-v4-pro",
+        "gpt-5.2":                    "deepseek-v4-pro",
     }
 
     model_config = {"env_prefix": "DS_GW_", "env_file": ".env", "env_nested_delimiter": "__"}
