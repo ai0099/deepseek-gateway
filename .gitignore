@@ -8,3 +8,4 @@ venv/
 .vscode/
 *.swp
 dist/
+raw_request.json
