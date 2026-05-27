@@ -71,8 +71,22 @@ async def proxy_responses(request: Request):
         transcoder = SSETranscoder(body.get("model", "gpt-5.5"), response_id, body)
 
         async def cached_stream():
-            async for event in transcoder.transcode_stream(upstream_resp):
-                yield event
+            try:
+                async for event in transcoder.transcode_stream(upstream_resp):
+                    yield event
+            except Exception as _e:
+                # Log streaming error
+                try:
+                    with open(_debug_log, 'a', encoding='utf-8') as _f:
+                        _f.write(f"STREAM ERROR: {_e}\n")
+                        import traceback as _tb
+                        _tb.print_exc(file=_f)
+                except: pass
+                yield transcoder._sse_event("response.failed", {
+                    "type": "response.failed",
+                    "response": {"id": transcoder._response_id, "status": "failed",
+                    "error": {"message": str(_e)}},
+                })
             # Cache the completed response for previous_response_id support
             msgs = list(chat_req.get("messages", []))
             assistant_msg = {"role": "assistant", "content": transcoder.full_text}
