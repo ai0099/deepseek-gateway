@@ -28,14 +28,24 @@ async def proxy_responses(request: Request):
 
     body = await request.json()
 
-    # DEBUG: Log full request to file
+    # DEBUG: Log request summary to file
     import json as _json, os as _os
     _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
     try:
         with open(_debug_log, 'a', encoding='utf-8') as _f:
             _f.write(f"\n{'='*60}\n")
             _f.write(f"TIME: {__import__('datetime').datetime.now().isoformat()}\n")
-            _f.write(f"REQUEST:\n{_json.dumps(body, ensure_ascii=False, indent=2)[:8000]}\n")
+            _f.write(f"MODEL: {body.get('model','?')}  STREAM: {body.get('stream','?')}  TOOLS: {len(body.get('tools') or [])}  INPUT_ITEMS: {len(body.get('input') or [])}\n")
+            _f.write(f"PREV_RESP_ID: {body.get('previous_response_id','none')}\n")
+            for i, item in enumerate(body.get('input') or []):
+                item_type = item.get('type', item.get('role', '?'))
+                content = item.get('content', item.get('output', ''))
+                if isinstance(content, str):
+                    content = content[:300]
+                elif isinstance(content, list):
+                    content = f"[{len(content)} parts: {[p.get('type','?') for p in content[:5]]}]"
+                _f.write(f"  input[{i}]: type={item_type} content={content}\n")
+            _f.write(f"INSTRUCTIONS_LEN: {len(body.get('instructions') or '')}\n")
     except: pass
 
     chat_req, response_id = _translator.translate_request(body)
@@ -43,7 +53,13 @@ async def proxy_responses(request: Request):
     # Log translated Chat Completions request
     try:
         with open(_debug_log, 'a', encoding='utf-8') as _f:
-            _f.write(f"TRANSLATED:\n{_json.dumps(chat_req, ensure_ascii=False, indent=2)[:8000]}\n")
+            msgs = chat_req.get('messages', [])
+            _f.write(f"TRANSLATED: model={chat_req.get('model')} stream={chat_req.get('stream')} thinking={chat_req.get('thinking','?')} msgs={len(msgs)}\n")
+            for j, m in enumerate(msgs[-10:] if len(msgs) > 10 else msgs):
+                c = str(m.get('content', ''))[:200] if m.get('content') else ''
+                tc = f" tool_calls={len(m.get('tool_calls',[]))}" if m.get('tool_calls') else ''
+                rc = f" rc={len(m.get('reasoning_content',''))}chars" if m.get('reasoning_content') else ''
+                _f.write(f"  msg[{j}]: role={m.get('role')}{tc}{rc} content={c}\n")
     except: pass
 
     rlog.model = chat_req.get("model", "-")
