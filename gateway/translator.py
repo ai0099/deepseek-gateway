@@ -159,6 +159,9 @@ class ResponsesTranslator:
         if not isinstance(item, dict):
             return None
         role = item.get("role", "user")
+        # DeepSeek Chat Completions doesn't support "developer" role
+        if role == "developer":
+            role = "system"
         content = item.get("content", [])
         parts: list[dict] = []
         if isinstance(content, str):
