@@ -158,14 +158,28 @@ class ResponsesTranslator:
     def _convert_input_item(self, item: dict) -> dict | None:
         if not isinstance(item, dict):
             return None
+
+        item_type = item.get("type", "")
+
+        # Responses API function_call_output → Chat Completions tool message
+        if item_type == "function_call_output":
+            return {
+                "role": "tool",
+                "tool_call_id": item.get("call_id", ""),
+                "content": item.get("output", ""),
+            }
+
         role = item.get("role", "user")
         # DeepSeek Chat Completions doesn't support "developer" role
         if role == "developer":
             role = "system"
+
         content = item.get("content", [])
         parts: list[dict] = []
         if isinstance(content, str):
             return {"role": role, "content": content}
+
+        tool_calls: list[dict] = []
         for part in (content if isinstance(content, list) else [content]):
             ptype = part.get("type", "")
             if ptype in ("input_text", "output_text"):
@@ -177,11 +191,30 @@ class ResponsesTranslator:
                 })
             elif ptype == "refusal":
                 parts.append({"type": "text", "text": f"[refusal] {part.get('refusal', '')}"})
+            elif ptype == "function_call":
+                tool_calls.append({
+                    "id": part.get("call_id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": part.get("name", ""),
+                        "arguments": part.get("arguments", ""),
+                    },
+                })
             elif ptype == "text":
                 parts.append(part)
-        if not parts:
+
+        if not parts and not tool_calls:
             return None
-        return {"role": role, "content": parts[0]["text"] if len(parts) == 1 and parts[0]["type"] == "text" else parts}
+
+        msg = {"role": role}
+        if tool_calls:
+            msg["tool_calls"] = tool_calls
+            msg["content"] = None
+        elif len(parts) == 1 and parts[0]["type"] == "text":
+            msg["content"] = parts[0]["text"]
+        elif parts:
+            msg["content"] = parts
+        return msg
 
     def _convert_tools(self, tools: list[dict] | None) -> list[dict] | None:
         if not tools:
