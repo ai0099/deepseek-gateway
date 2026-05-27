@@ -36,9 +36,14 @@ async def proxy_responses(request: Request):
             _tb.print_exc(file=_f)
         return JSONResponse({"error": {"message": str(_e)}}, status_code=400)
 
-    # DEBUG: Log request summary to file
+    # DEBUG: Log request summary AND save raw body to file
     import json as _json, os as _os
     _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
+    _raw_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'raw_request.json')
+    try:
+        with open(_raw_log, 'w', encoding='utf-8') as _f:
+            _json.dump(body, _f, ensure_ascii=False, indent=2)
+    except: pass
     try:
         with open(_debug_log, 'a', encoding='utf-8') as _f:
             _f.write(f"\n{'='*60}\n")
@@ -47,12 +52,13 @@ async def proxy_responses(request: Request):
             _f.write(f"PREV_RESP_ID: {body.get('previous_response_id','none')}\n")
             for i, item in enumerate(body.get('input') or []):
                 item_type = item.get('type', item.get('role', '?'))
+                item_role = item.get('role', '-')
                 content = item.get('content', item.get('output', ''))
                 if isinstance(content, str):
-                    content = content[:300]
+                    content = content[:200]
                 elif isinstance(content, list):
-                    content = f"[{len(content)} parts: {[p.get('type','?') for p in content[:5]]}]"
-                _f.write(f"  input[{i}]: type={item_type} content={content}\n")
+                    content = f"[{len(content)} parts]"
+                _f.write(f"  input[{i}]: type={item_type} role={item_role} content={content}\n")
             _f.write(f"INSTRUCTIONS_LEN: {len(body.get('instructions') or '')}\n")
     except: pass
 
