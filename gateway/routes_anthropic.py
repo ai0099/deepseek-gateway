@@ -19,6 +19,7 @@ MAX_OUTPUT_TOKENS = 16384
 
 
 @router.api_route("/anthropic/v1/messages", methods=["POST", "OPTIONS"])
+@router.api_route("/v1/messages", methods=["POST", "OPTIONS"])
 async def proxy_anthropic(request: Request):
     if request.method == "OPTIONS":
         return _cors_response()
