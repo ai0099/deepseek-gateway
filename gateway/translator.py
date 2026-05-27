@@ -213,6 +213,10 @@ class ResponsesTranslator:
 
         item_type = item.get("type", "")
 
+        # Reasoning items are handled by translate_request's cross-turn logic
+        if item_type == "reasoning":
+            return None
+
         # Responses API function_call_output → Chat Completions tool message
         if item_type == "function_call_output":
             return {
@@ -233,6 +237,8 @@ class ResponsesTranslator:
 
         tool_calls: list[dict] = []
         for part in (content if isinstance(content, list) else [content]):
+            if part is None:
+                continue
             ptype = part.get("type", "")
             if ptype in ("input_text", "output_text"):
                 parts.append({"type": "text", "text": part.get("text", "")})
