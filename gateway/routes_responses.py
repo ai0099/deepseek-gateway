@@ -30,12 +30,25 @@ async def proxy_responses(request: Request):
     chat_req, response_id = _translator.translate_request(body)
     rlog.model = chat_req.get("model", "-")
     rlog.streaming = chat_req.get("stream", False)
+    # Log key request details for debugging
+    import logging
+    _log = logging.getLogger("gateway")
+    _log.info("Responses req: model=%s stream=%s tools=%s input_items=%s msgs=%s",
+              body.get("model"), body.get("stream"),
+              len(body.get("tools") or []), len(body.get("input") or []),
+              len(chat_req.get("messages") or []))
 
     if chat_req.get("stream"):
-        upstream_resp = await stream_chat_completions(
-            chat_req, config.chat_completions_endpoint, config.deepseek_api_key
-        )
-        rlog.finish(upstream_resp.status_code)
+        try:
+            upstream_resp = await stream_chat_completions(
+                chat_req, config.chat_completions_endpoint, config.deepseek_api_key
+            )
+            rlog.finish(upstream_resp.status_code)
+        except Exception as e:
+            rlog.finish(500)
+            return JSONResponse({
+                "error": {"message": f"Upstream connection failed: {str(e)}", "type": "upstream_error"},
+            }, status_code=502)
 
         from .sse_transcoder import SSETranscoder
         transcoder = SSETranscoder(body.get("model", "gpt-4o"))

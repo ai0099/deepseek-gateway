@@ -191,13 +191,13 @@ class ResponsesTranslator:
             if not isinstance(tool, dict):
                 continue
             ttype = tool.get("type", "")
-            if ttype == "function":
+            if ttype in ("function", "web_search", "web_search_preview", "code_interpreter"):
                 result.append({
                     "type": "function",
                     "function": {
-                        "name": tool.get("name", ""),
-                        "description": tool.get("description", ""),
-                        "parameters": tool.get("parameters", {}),
+                        "name": tool.get("name", ttype),
+                        "description": tool.get("description", f"Built-in {ttype} tool"),
+                        "parameters": tool.get("parameters", {"type": "object", "properties": {}, "required": []}),
                     }
                 })
             elif ttype == "custom":
