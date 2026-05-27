@@ -26,7 +26,15 @@ async def proxy_responses(request: Request):
     config = load_config()
     rlog = RequestLog("POST", "/v1/responses", detect_client_type(request))
 
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception as _e:
+        import json as _json, os as _os, traceback as _tb
+        _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"JSON PARSE ERROR: {_e}\n")
+            _tb.print_exc(file=_f)
+        return JSONResponse({"error": {"message": str(_e)}}, status_code=400)
 
     # DEBUG: Log request summary to file
     import json as _json, os as _os
@@ -71,7 +79,17 @@ async def proxy_responses(request: Request):
               len(body.get("tools") or []), len(body.get("input") or []),
               len(chat_req.get("messages") or []))
 
-    if chat_req.get("stream"):
+    try:
+        _stream_mode = chat_req.get("stream")
+    except Exception as _e:
+        import json as _json, os as _os, traceback as _tb
+        _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"HANDLER ERROR: {_e}\n")
+            _tb.print_exc(file=_f)
+        return JSONResponse({"error": {"message": str(_e)}}, status_code=500)
+
+    if _stream_mode:
         try:
             upstream_resp = await stream_chat_completions(
                 chat_req, config.chat_completions_endpoint, config.deepseek_api_key
