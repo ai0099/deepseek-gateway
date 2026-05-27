@@ -228,11 +228,15 @@ class SSETranscoder:
             idx = tc_delta.get("index", 0)
             while len(self._tool_calls) <= idx:
                 self._tool_calls.append({"id": "", "name": "", "arguments": ""})
+            while len(self.full_tool_calls) <= idx:
+                self.full_tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
             if "id" in tc_delta and tc_delta["id"]:
                 self._tool_calls[idx]["id"] = tc_delta["id"]
+                self.full_tool_calls[idx]["id"] = tc_delta["id"]
             func = tc_delta.get("function", {})
             if "name" in func and func["name"]:
                 self._tool_calls[idx]["name"] = func["name"]
+                self.full_tool_calls[idx]["function"]["name"] = func["name"]
                 call_id = self._tool_calls[idx]["id"] or f"call_{uuid.uuid4().hex[:8]}"
                 events.append(self._sse_event("response.output_item.added", {
                     "type": "response.output_item.added",
@@ -244,6 +248,7 @@ class SSETranscoder:
                 }))
             if "arguments" in func:
                 self._tool_calls[idx]["arguments"] += func["arguments"]
+                self.full_tool_calls[idx]["function"]["arguments"] += func["arguments"]
                 call_id = self._tool_calls[idx]["id"] or f"call_{uuid.uuid4().hex[:8]}"
                 events.append(self._sse_event("response.function_call_arguments.delta", {
                     "type": "response.function_call_arguments.delta",
