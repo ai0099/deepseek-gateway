@@ -14,8 +14,9 @@ import time
 
 
 class SSETranscoder:
-    def __init__(self, client_model: str):
+    def __init__(self, client_model: str, response_id: str = ""):
         self._model = client_model
+        self._response_id = response_id or f"resp_{uuid.uuid4().hex[:12]}"
         self._reset()
         # Accumulated full response for cross-turn caching
         self.full_text = ""
@@ -24,7 +25,6 @@ class SSETranscoder:
         self.usage: dict = {}
 
     def _reset(self):
-        self._response_id = f"resp_{uuid.uuid4().hex[:12]}"
         self._msg_id = f"msg_{uuid.uuid4().hex[:12]}"
         self._rs_id = f"rs_{uuid.uuid4().hex[:8]}"
         self._content_index = 0
