@@ -99,13 +99,9 @@ class ResponsesTranslator:
             "messages": messages,
             "stream": stream_mode,
         }
-        # Enable DeepSeek thinking/reasoning mode (streaming only)
-        if stream_mode:
-            chat_req["thinking"] = {"type": "enabled"}
-        # Pass reasoning_effort (xhigh -> max on DeepSeek side)
-        reasoning_effort = req.get("reasoning_effort")
-        if reasoning_effort:
-            chat_req["reasoning_effort"] = reasoning_effort
+        # Always enable DeepSeek thinking mode with max effort
+        chat_req["thinking"] = {"type": "enabled"}
+        chat_req["reasoning_effort"] = "max"
         if tools:
             chat_req["tools"] = tools
             # tool_choice: only set when tools are present

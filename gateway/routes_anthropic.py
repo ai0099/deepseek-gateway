@@ -113,18 +113,23 @@ async def _sse_masquerade(upstream_resp, mapper):
 
 
 def _clean_anthropic_body(body: dict):
-    """Apply safe limits and fix Claude Code sub-agent thinking conflict.
-
-    Claude Code >=2.1.166 hardcodes thinking:{type:"disabled"} alongside
-    reasoning_effort for sub-agents — DeepSeek rejects this combination.
-    We override disabled→enabled so thinking mode actually works.
-    """
+    """Apply safe limits, enforce max thinking effort, and fix sub-agent conflicts."""
     if body.get("max_tokens", 0) > MAX_OUTPUT_TOKENS:
         body["max_tokens"] = MAX_OUTPUT_TOKENS
 
     _fix_thinking_disabled(body)
+    _enforce_max_effort(body)
 
     _truncate_tool_results(body.get("messages", []))
+
+
+def _enforce_max_effort(body: dict):
+    """Always set output_config.effort to max for Anthropic requests."""
+    output_config = body.get("output_config")
+    if not isinstance(output_config, dict):
+        output_config = {}
+    output_config["effort"] = "max"
+    body["output_config"] = output_config
 
 
 def _fix_thinking_disabled(body: dict):
