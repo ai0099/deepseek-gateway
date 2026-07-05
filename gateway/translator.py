@@ -102,10 +102,9 @@ class ResponsesTranslator:
         # Always enable DeepSeek thinking mode with max effort
         chat_req["thinking"] = {"type": "enabled"}
         chat_req["reasoning_effort"] = "max"
+        chat_req["tool_choice"] = req.get("tool_choice", "auto")
         if tools:
             chat_req["tools"] = tools
-            # tool_choice: only set when tools are present
-            chat_req["tool_choice"] = req.get("tool_choice", "auto")
         if req.get("response_format"):
             chat_req["response_format"] = req["response_format"]
         if req.get("temperature") is not None:
