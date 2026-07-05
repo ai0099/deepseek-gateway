@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Upstream DeepSeek
     deepseek_api_key: str = ""
     base_url: str = "https://api.deepseek.com"
+    beta_base_url: str = "https://api.deepseek.com/beta"
     request_timeout: int = 300
     max_retries: int = 2
 
@@ -28,10 +29,12 @@ class Settings(BaseSettings):
     }
 
     # Responses API model mapping (OpenAI model → DeepSeek model)
+    # NOTE: Do NOT use [1m] suffix here — DeepSeek Chat Completions API rejects it.
+    # [1m] is a Claude Code client-side convention only.
     responses_model_map: dict = {
         "gpt-5.5":                    "deepseek-v4-pro",
         "gpt-5.4":                    "deepseek-v4-pro",
-        "gpt-5.4-mini":               "deepseek-v4-flash",
+        "gpt-5.4-mini":               "deepseek-v4-pro",
         "gpt-5.3-codex":              "deepseek-v4-pro",
         "gpt-5.2":                    "deepseek-v4-pro",
     }
@@ -45,6 +48,10 @@ class Settings(BaseSettings):
     @property
     def chat_completions_endpoint(self) -> str:
         return f"{self.base_url}/v1/chat/completions"
+
+    @property
+    def beta_chat_completions_endpoint(self) -> str:
+        return f"{self.beta_base_url}/v1/chat/completions"
 
     @property
     def is_configured(self) -> bool:

@@ -4,6 +4,7 @@ Non-streaming path. For streaming see sse_transcoder.py.
 
 import uuid
 from .mapper import get_mapper
+from .cache_prefix import inject_prefix_chat
 
 
 class ResponseCache:
@@ -31,9 +32,9 @@ class ResponsesTranslator:
 
     # ── Request: Responses API → Chat Completions ──
 
-    def translate_request(self, req: dict) -> tuple[dict, str]:
+    def translate_request(self, req: dict) -> tuple[dict, str, bool]:
         """Translate a Responses API request dict to Chat Completions request dict.
-        Returns (chat_req_body, response_id_for_tracking).
+        Returns (chat_req_body, response_id_for_tracking, use_beta_endpoint).
         """
         response_id = f"resp_{uuid.uuid4().hex[:12]}"
         messages: list[dict] = []
@@ -89,25 +90,39 @@ class ResponsesTranslator:
         messages = self._merge_consecutive_tool_calls(messages)
         messages = self._fix_tool_call_continuity(messages)
 
+        # Inject stable AGENTS.md cache prefix for KV cache pooling across clients
+        messages = inject_prefix_chat(messages)
+
+        stream_mode = req.get("stream", False)
         chat_req = {
             "model": upstream_model,
             "messages": messages,
-            "stream": req.get("stream", False),
-            # Enable DeepSeek thinking/reasoning mode
-            "thinking": {"type": "enabled"},
+            "stream": stream_mode,
         }
+        # Enable DeepSeek thinking/reasoning mode (streaming only)
+        if stream_mode:
+            chat_req["thinking"] = {"type": "enabled"}
+        # Pass reasoning_effort (xhigh -> max on DeepSeek side)
+        reasoning_effort = req.get("reasoning_effort")
+        if reasoning_effort:
+            chat_req["reasoning_effort"] = reasoning_effort
         if tools:
             chat_req["tools"] = tools
-        if req.get("tool_choice"):
-            chat_req["tool_choice"] = req["tool_choice"]
+            # tool_choice: only set when tools are present
+            chat_req["tool_choice"] = req.get("tool_choice", "auto")
+        if req.get("response_format"):
+            chat_req["response_format"] = req["response_format"]
         if req.get("temperature") is not None:
             chat_req["temperature"] = req["temperature"]
-        if req.get("max_output_tokens"):
-            chat_req["max_tokens"] = req["max_output_tokens"]
+        # Default to 384K (393216) if not specified
+        chat_req["max_tokens"] = req.get("max_output_tokens", 393216)
         if req.get("top_p") is not None:
             chat_req["top_p"] = req["top_p"]
 
-        return chat_req, response_id
+        # Determine if we need beta endpoint for strict-mode tools
+        use_beta = any(t.get("strict") for t in (tools or []))
+
+        return chat_req, response_id, use_beta
 
     def _merge_consecutive_tool_calls(self, messages: list[dict]) -> list[dict]:
         """Merge consecutive assistant(tool_calls) messages into one with multiple tool_calls.
@@ -336,10 +351,8 @@ class ResponsesTranslator:
             if ptype in ("input_text", "output_text"):
                 parts.append({"type": "text", "text": part.get("text", "")})
             elif ptype == "input_image":
-                parts.append({
-                    "type": "image_url",
-                    "image_url": {"url": part.get("image_url", ""), "detail": part.get("detail", "auto")},
-                })
+                # DeepSeek V4 does not support image_url; replace with placeholder text
+                parts.append({"type": "text", "text": "[image]"})
             elif ptype == "refusal":
                 parts.append({"type": "text", "text": f"[refusal] {part.get('refusal', '')}"})
             elif ptype == "function_call":
@@ -376,12 +389,20 @@ class ResponsesTranslator:
                 continue
             ttype = tool.get("type", "")
             if ttype in ("function", "web_search", "web_search_preview", "code_interpreter"):
+                params = tool.get("parameters", {"type": "object", "properties": {}, "required": []})
+                if isinstance(params, dict):
+                    # strict mode: auto-populate required from properties keys
+                    props = params.get("properties", {})
+                    if isinstance(props, dict) and props:
+                        params.setdefault("required", list(props.keys()))
+                    params["additionalProperties"] = False
                 result.append({
                     "type": "function",
                     "function": {
                         "name": tool.get("name", ttype),
                         "description": tool.get("description", f"Built-in {ttype} tool"),
-                        "parameters": tool.get("parameters", {"type": "object", "properties": {}, "required": []}),
+                        "parameters": params,
+                        "strict": tool.get("strict", False),
                     }
                 })
             elif ttype == "custom":
@@ -390,7 +411,13 @@ class ResponsesTranslator:
                     "function": {
                         "name": tool.get("name", ""),
                         "description": tool.get("description", ""),
-                        "parameters": {"type": "object", "properties": {"input": {"type": "string"}}},
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"input": {"type": "string"}},
+                            "required": ["input"],
+                            "additionalProperties": False,
+                        },
+                        "strict": tool.get("strict", False),
                     }
                 })
         return result or None

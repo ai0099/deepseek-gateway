@@ -2,6 +2,8 @@
 
 import time
 import logging
+import json
+from pathlib import Path
 
 logger = logging.getLogger("deepseek-gateway")
 
@@ -25,15 +27,49 @@ class RequestLog:
         self.model = ""
         self.streaming = False
         self.status = 0
+        self.usage = None  # token usage dict
 
-    def finish(self, status: int):
+    def finish(self, status: int, usage: dict = None):
         self.status = status
+        self.usage = usage
         elapsed = (time.monotonic() - self.start) * 1000
+        
+        # Token stats line
+        token_info = ""
+        if usage:
+            inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+            out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+            total = usage.get("total_tokens", inp + out)
+            # DeepSeek disk cache fields
+            cache_hit = usage.get("prompt_cache_hit_tokens", 0)
+            cache_miss = usage.get("prompt_cache_miss_tokens", 0)
+            if cache_hit or cache_miss:
+                hit_rate = cache_hit / (cache_hit + cache_miss) * 100 if (cache_hit + cache_miss) > 0 else 0
+                cache_info = f" cache: {cache_hit/1e3:.1f}K hit + {cache_miss/1e3:.1f}K miss = {hit_rate:.0f}%"
+            else:
+                cache_info = ""
+            token_info = f" | {inp/1e3:.0f}K+{out/1e3:.0f}K={total/1e3:.0f}K{cache_info}"
+        
         logger.info(
             f"{self.method} {self.path} | {self.client_type} | "
             f"model={self.model or '-'} | stream={self.streaming} | "
-            f"{status} | {elapsed:.0f}ms"
+            f"{status} | {elapsed:.0f}ms{token_info}"
         )
+        
+        # Write token usage to dedicated log file
+        if usage:
+            token_log = Path(__file__).parent.parent / "token_usage.log"
+            try:
+                entry = {
+                    "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "client": self.client_type,
+                    "model": self.model,
+                    "usage": usage,
+                }
+                with open(token_log, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
 
 
 def detect_client_type(request) -> str:

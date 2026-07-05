@@ -9,13 +9,14 @@ from .config import load_config
 from .mapper import get_mapper
 from .upstream import stream_anthropic, post_anthropic_non_streaming
 from .logger import RequestLog, detect_client_type
+from .cache_prefix import inject_prefix_anthropic
 
 router = APIRouter()
 
 # Anthropic SSE events that carry a "model" field (need masquerade on response)
 ANTHROPIC_MODEL_EVENTS = {"message_start"}
-MAX_TOOL_RESULT_CHARS = 12000
-MAX_OUTPUT_TOKENS = 16384
+MAX_TOOL_RESULT_CHARS = 100000
+MAX_OUTPUT_TOKENS = 256000
 
 
 @router.api_route("/anthropic/v1/messages", methods=["POST", "OPTIONS"])
@@ -46,6 +47,9 @@ async def proxy_anthropic(request: Request):
     rlog.streaming = body.get("stream", False)
 
     _clean_anthropic_body(body)
+
+    # Inject stable CLAUDE.md cache prefix for KV cache pooling across clients
+    body["messages"] = inject_prefix_anthropic(body.get("messages", []))
 
     if body.get("stream"):
         try:
@@ -109,11 +113,43 @@ async def _sse_masquerade(upstream_resp, mapper):
 
 
 def _clean_anthropic_body(body: dict):
-    """Apply safe limits. thinking/budget_tokens passed through for DeepSeek reasoning."""
+    """Apply safe limits and fix Claude Code sub-agent thinking conflict.
+
+    Claude Code >=2.1.166 hardcodes thinking:{type:"disabled"} alongside
+    reasoning_effort for sub-agents — DeepSeek rejects this combination.
+    We override disabled→enabled so thinking mode actually works.
+    """
     if body.get("max_tokens", 0) > MAX_OUTPUT_TOKENS:
         body["max_tokens"] = MAX_OUTPUT_TOKENS
 
+    _fix_thinking_disabled(body)
+
     _truncate_tool_results(body.get("messages", []))
+
+
+def _fix_thinking_disabled(body: dict):
+    """If thinking is explicitly disabled, flip it to enabled.
+
+    Claude Code sends thinking:{type:"disabled"} for sub-agents even when
+    CLAUDE_CODE_EFFORT_LEVEL=max is set.  This is a known conflict with
+    DeepSeek's /anthropic endpoint — reasoning_effort demands thinking on.
+    """
+    thinking = body.get("thinking")
+    if not isinstance(thinking, dict):
+        return
+    if thinking.get("type") != "disabled":
+        return
+
+    thinking["type"] = "enabled"
+    # Note: budget_tokens is ignored by DeepSeek API (per official docs).
+    # Don't inject it — it pollutes request body consistency and hurts KV cache hit rate.
+    body["thinking"] = thinking
+
+    # Also patch output_config if present (Anthropic-format effort param)
+    output_config = body.get("output_config")
+    if isinstance(output_config, dict) and "effort" in output_config:
+        # effort is set → keep it (it was conflicting with disabled; now fixed)
+        pass
 
 
 def _truncate_tool_results(messages: list):

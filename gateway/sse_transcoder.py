@@ -24,6 +24,7 @@ class SSETranscoder:
         self.full_reasoning = ""
         self.full_tool_calls: list[dict] = []
         self.usage: dict = {}
+        self.web_search_calls: list[dict] = []
 
     def _reset(self):
         self._msg_id = f"msg_{uuid.uuid4().hex[:12]}"
@@ -71,6 +72,16 @@ class SSETranscoder:
                     chunk = json.loads(data_str)
                 except json.JSONDecodeError:
                     continue
+                # Log raw chunk for debugging usage/cache hit data
+                try:
+                    import os as _os2
+                    _raw_chunk_log = _os2.path.join(_os2.path.dirname(_os2.path.dirname(__file__)), 'raw_chunks.log')
+                    # Only log chunks with usage or specific patterns
+                    if "usage" in chunk or "finish_reason" in str(chunk)[:200]:
+                        with open(_raw_chunk_log, 'a', encoding='utf-8') as _rf:
+                            import json as _json2
+                            _rf.write(_json2.dumps(chunk, ensure_ascii=False) + '\n')
+                except: pass
                 for event in self._process_chunk(chunk):
                     yield event
         except Exception as e:
@@ -239,6 +250,8 @@ class SSETranscoder:
                 self._tool_calls[idx]["name"] = func["name"]
                 self.full_tool_calls[idx]["function"]["name"] = func["name"]
                 call_id = self._tool_calls[idx]["id"] or f"call_{uuid.uuid4().hex[:8]}"
+                if func["name"] == "web_search":
+                    continue
                 events.append(self._sse_event("response.output_item.added", {
                     "type": "response.output_item.added",
                     "item": {
@@ -249,6 +262,9 @@ class SSETranscoder:
                 }))
             if "arguments" in func:
                 self._tool_calls[idx]["arguments"] += func["arguments"]
+                tc_name = self._tool_calls[idx].get("name", "")
+                if tc_name == "web_search":
+                    continue
                 self.full_tool_calls[idx]["function"]["arguments"] += func["arguments"]
                 call_id = self._tool_calls[idx]["id"] or f"call_{uuid.uuid4().hex[:8]}"
                 events.append(self._sse_event("response.function_call_arguments.delta", {
@@ -256,6 +272,10 @@ class SSETranscoder:
                     "item_id": call_id, "delta": func["arguments"],
                 }))
 
+        self.web_search_calls = [
+            {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": tc["arguments"]}}
+            for tc in self._tool_calls if tc["name"] == "web_search"
+        ]
         self._state = "FUNCTION_CALL_OPEN"
         return events
 
