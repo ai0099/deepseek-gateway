@@ -64,8 +64,8 @@ class ResponsesTranslator:
                             s.get("text", "") for s in (item.get("summary") or [])
                         )
                     continue
-                # Attach pending reasoning to assistant messages with tool_calls
-                if pending_reasoning and msg.get("role") == "assistant" and msg.get("tool_calls"):
+                # Attach pending reasoning to ANY assistant message
+                if pending_reasoning and msg.get("role") == "assistant":
                     msg["reasoning_content"] = pending_reasoning
                     pending_reasoning = ""
                 # Attach pending reasoning to the last assistant message if it's the first user/tool msg
