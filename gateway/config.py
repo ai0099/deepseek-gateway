@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8080
     log_level: str = "info"
+    debug: bool = False  # DS_GW_DEBUG
 
     # Upstream DeepSeek
     deepseek_api_key: str = ""

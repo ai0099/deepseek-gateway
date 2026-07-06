@@ -38,6 +38,9 @@ def create_app() -> FastAPI:
     # Catch-all request logger
     @app.middleware("http")
     async def log_all_requests(request, call_next):
+        config = load_config()
+        if not config.debug:
+            return await call_next(request)
         import os as _os, json as _json
         _debug_log = _os.path.join(_os.path.dirname(__file__), '..', 'debug_requests.log')
         try:
@@ -86,12 +89,14 @@ def create_app() -> FastAPI:
     # Catch-all route to log unmatched requests (debugging)
     @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
     async def catch_all(request, full_path: str):
-        import os as _os
-        _debug_log = _os.path.join(_os.path.dirname(__file__), '..', 'debug_requests.log')
-        try:
-            with open(_debug_log, 'a', encoding='utf-8') as _f:
-                _f.write(f"[UNMATCHED] {request.method} /{full_path} from {request.client.host if request.client else '?'}\n")
-        except: pass
+        config = load_config()
+        if config.debug:
+            import os as _os
+            _debug_log = _os.path.join(_os.path.dirname(__file__), "..", "debug_requests.log")
+            try:
+                with open(_debug_log, "a", encoding="utf-8") as _f:
+                    _f.write(f"[UNMATCHED] {request.method} /{full_path} from {request.client.host if request.client else chr(63)}")
+            except: pass
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "not found", "path": f"/{full_path}"}, status_code=404)
 
