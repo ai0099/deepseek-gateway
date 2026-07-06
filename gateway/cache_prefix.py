@@ -28,10 +28,11 @@ def _get_anchor_messages():
 
 def inject_prefix_with_anchors(messages, main_prefix):
     anchors = _get_anchor_messages()
-    main_msg = {"role": "system", "content": main_prefix}
-    # Anchors at both ends: start anchors provide stable prefix for KV cache,
-    # end anchors act as bookmarks at turn boundaries for cache unit matching.
-    return anchors + [main_msg] + messages + anchors
+    # Anchors at both ends for KV cache: start anchors = stable prefix,
+    # end anchors = stable bookmarks at turn boundaries.
+    # AGENTS.md content is no longer injected here — Codex Desktop already
+    # embeds it in the input array (as a user-role context message).
+    return anchors + messages + anchors
 
 def _build_stable_prefix(claude_md_path):
     content = claude_md_path.read_text(encoding="utf-8")
