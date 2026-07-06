@@ -104,10 +104,11 @@ class SSETranscoder:
     def _process_chunk(self, chunk: dict) -> list[str]:
         """Dispatch one Chat Completions chunk to the right handler. Returns list of SSE strings."""
         choices = chunk.get("choices") or []
+        # Capture usage from any chunk (DeepSeek includes it in every chunk with stream_options)
+        if "usage" in chunk:
+            self._usage = chunk["usage"]
+            self.usage = chunk["usage"]
         if not choices:
-            if "usage" in chunk:
-                self._usage = chunk["usage"]
-                self.usage = chunk["usage"]
             return []
 
         delta = choices[0].get("delta", {})

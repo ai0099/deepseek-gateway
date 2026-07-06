@@ -102,6 +102,9 @@ class ResponsesTranslator:
         # Always enable DeepSeek thinking mode with max effort
         chat_req["thinking"] = {"type": "enabled"}
         chat_req["reasoning_effort"] = "max"
+        # Request usage stats in streaming mode (for cache hit tracking)
+        if stream_mode:
+            chat_req["stream_options"] = {"include_usage": True}
         chat_req["tool_choice"] = req.get("tool_choice", "auto")
         if tools:
             chat_req["tools"] = tools
