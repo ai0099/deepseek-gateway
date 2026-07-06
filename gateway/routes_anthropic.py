@@ -15,8 +15,7 @@ router = APIRouter()
 
 # Anthropic SSE events that carry a "model" field (need masquerade on response)
 ANTHROPIC_MODEL_EVENTS = {"message_start"}
-MAX_TOOL_RESULT_CHARS = 100000
-MAX_OUTPUT_TOKENS = 256000
+from .config import MAX_TOOL_RESULT_CHARS, MAX_OUTPUT_TOKENS
 
 
 @router.api_route("/anthropic/v1/messages", methods=["POST", "OPTIONS"])
@@ -113,7 +112,10 @@ async def _sse_masquerade(upstream_resp, mapper):
 
 
 def _clean_anthropic_body(body: dict):
-    """Apply safe limits, enforce max thinking effort, and fix sub-agent conflicts."""
+    """Apply safe limits, enforce max thinking effort, and fix sub-agent conflicts.
+
+    NOTE: mutates body dict in-place.
+    """
     if body.get("max_tokens", 0) > MAX_OUTPUT_TOKENS:
         body["max_tokens"] = MAX_OUTPUT_TOKENS
 

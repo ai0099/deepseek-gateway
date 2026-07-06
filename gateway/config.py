@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     def is_configured(self) -> bool:
         return bool(self.deepseek_api_key and self.deepseek_api_key != "sk-your-deepseek-api-key-here")
 
+# --- Constants ---
+MAX_OUTPUT_TOKENS: int = 256000          # Anthropic: max output tokens
+MAX_TOOL_RESULT_CHARS: int = 100000      # Anthropic: max chars per tool result
+DEFAULT_MAX_OUTPUT_TOKENS: int = 393216  # Responses API: default max output tokens
 
 # Singleton
 _settings: Settings | None = None

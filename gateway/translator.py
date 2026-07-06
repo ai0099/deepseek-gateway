@@ -8,18 +8,17 @@ from .cache_prefix import inject_prefix_chat
 
 
 class ResponseCache:
-    """In-memory LRU cache for previous_response_id lookups."""
+    """In-memory LRU cache for previous_response_id lookups. Uses OrderedDict for O(1) eviction."""
     def __init__(self, max_entries: int = 100):
-        self._cache: dict[str, dict] = {}
-        self._order: list[str] = []
+        self._cache: "OrderedDict[str, dict]" = __import__("collections").OrderedDict()
         self._max = max_entries
 
     def store(self, response_id: str, messages: list[dict], model: str, usage: dict):
-        if len(self._order) >= self._max:
-            oldest = self._order.pop(0)
-            self._cache.pop(oldest, None)
+        if response_id in self._cache:
+            del self._cache[response_id]
+        elif len(self._cache) >= self._max:
+            self._cache.popitem(last=False)
         self._cache[response_id] = {"messages": messages, "model": model, "usage": usage}
-        self._order.append(response_id)
 
     def lookup(self, response_id: str) -> dict | None:
         return self._cache.get(response_id)
@@ -113,7 +112,7 @@ class ResponsesTranslator:
         if req.get("temperature") is not None:
             chat_req["temperature"] = req["temperature"]
         # Default to 384K (393216) if not specified
-        chat_req["max_tokens"] = req.get("max_output_tokens", 393216)
+        chat_req["max_tokens"] = req.get("max_output_tokens", _DEFAULT_MAX_TOKENS)
         if req.get("top_p") is not None:
             chat_req["top_p"] = req["top_p"]
 
@@ -171,9 +170,9 @@ class ResponsesTranslator:
             if in_tool_sequence and not is_tool:
                 # Flush any deferred system messages BEFORE the tool sequence
                 insert_pos = len(result)
-                for m in reversed(result):
-                    if m.get("role") == "assistant" and m.get("tool_calls"):
-                        insert_pos = result.index(m)
+                for idx in range(len(result) - 1, -1, -1):
+                    if result[idx].get("role") == "assistant" and result[idx].get("tool_calls"):
+                        insert_pos = idx
                         break
                 for ds in deferred_system:
                     result.insert(insert_pos, ds)
@@ -187,9 +186,9 @@ class ResponsesTranslator:
         # Flush remaining deferred at end of tool sequence
         if deferred_system:
             insert_pos = len(result)
-            for m in reversed(result):
-                if m.get("role") == "assistant" and m.get("tool_calls"):
-                    insert_pos = result.index(m)
+            for idx in range(len(result) - 1, -1, -1):
+                if result[idx].get("role") == "assistant" and result[idx].get("tool_calls"):
+                    insert_pos = idx
                     break
             for ds in deferred_system:
                 result.insert(insert_pos, ds)
@@ -392,7 +391,8 @@ class ResponsesTranslator:
                     # strict mode: auto-populate required from properties keys
                     props = params.get("properties", {})
                     if isinstance(props, dict) and props:
-                        params.setdefault("required", list(props.keys()))
+                        params = dict(params)  # copy to avoid mutating input
+                    params.setdefault("required", list(props.keys()))
                     params["additionalProperties"] = False
                 result.append({
                     "type": "function",
