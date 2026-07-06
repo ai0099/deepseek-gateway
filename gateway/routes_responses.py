@@ -29,78 +29,12 @@ async def proxy_responses(request: Request):
     try:
         body = await request.json()
     except Exception as _e:
-        if config.debug:
-                import json as _json, os as _os, traceback as _tb
-                _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
-                with open(_debug_log, 'a', encoding='utf-8') as _f:
-                    _f.write(f"JSON PARSE ERROR: {_e}\n")
-                    _tb.print_exc(file=_f)
         return JSONResponse({"error": {"message": str(_e)}}, status_code=400)
 
-    if config.debug:
-        # DEBUG: Log request summary AND save raw body to file
-        import json as _json, os as _os
-        _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
-        _raw_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'raw_request.json')
-        try:
-            with open(_raw_log, 'w', encoding='utf-8') as _f:
-                _json.dump(body, _f, ensure_ascii=False, indent=2)
-        except: pass
-        try:
-            with open(_debug_log, 'a', encoding='utf-8') as _f:
-                _f.write(f"\n{'='*60}\n")
-                _f.write(f"TIME: {__import__('datetime').datetime.now().isoformat()}\n")
-                _f.write(f"MODEL: {body.get('model','?')}  STREAM: {body.get('stream','?')}  TOOLS: {len(body.get('tools') or [])}  INPUT_ITEMS: {len(body.get('input') or [])}\n")
-                _f.write(f"PREV_RESP_ID: {body.get('previous_response_id','none')}\n")
-                for i, item in enumerate(body.get('input') or []):
-                    item_type = item.get('type', item.get('role', '?'))
-                    item_role = item.get('role', '-')
-                    content = item.get('content', item.get('output', ''))
-                    if isinstance(content, str):
-                        content = content[:200]
-                    elif isinstance(content, list):
-                        content = f"[{len(content)} parts]"
-                    _f.write(f"  input[{i}]: type={item_type} role={item_role} content={content}\n")
-                _f.write(f"INSTRUCTIONS_LEN: {len(body.get('instructions') or '')}\n")
-        except: pass
 
     chat_req, response_id, use_beta = _translator.translate_request(body)
 
-    if config.debug:
-        # Log translated Chat Completions request
-        try:
-            with open(_debug_log, 'a', encoding='utf-8') as _f:
-                msgs = chat_req.get('messages', [])
-                _f.write(f"TRANSLATED: model={chat_req.get('model')} stream={chat_req.get('stream')} thinking={chat_req.get('thinking','?')} msgs={len(msgs)}\n")
-                # Log first 10 messages with FULL content (anchors + AGENTS.md start)
-                _f.write("  --- FIRST 10 MESSAGES ---\n")
-                for j, m in enumerate(msgs[:10]):
-                    c = str(m.get('content', '')) if m.get('content') else ''
-                    tc = f" tool_calls={len(m.get('tool_calls',[]))}" if m.get('tool_calls') else ''
-                    _f.write(f"  msg[{j}]: role={m.get('role')}{tc} [{len(c)} chars] {c[:500]}\n")
-                if len(msgs) > 10:
-                    _f.write(f"  ... ({len(msgs)-10} more messages)\n")
-        except: pass
 
-    if config.debug:
-        # Save full translated request for manual inspection
-        try:
-            _translated_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'translated_request.json')
-            _slim = dict(chat_req)
-            if 'messages' in _slim:
-                _slim_msgs = []
-                for m in _slim['messages']:
-                    slim_m = {}
-                    for k, v in m.items():
-                        if isinstance(v, str) and len(v) > 1000:
-                            slim_m[k] = v[:1000] + '...'
-                        else:
-                            slim_m[k] = v
-                    _slim_msgs.append(slim_m)
-                _slim['messages'] = _slim_msgs
-            with open(_translated_log, 'w', encoding='utf-8') as _f:
-                _json.dump(_slim, _f, ensure_ascii=False, indent=2)
-        except: pass
     rlog.model = chat_req.get("model", "-")
     rlog.streaming = chat_req.get("stream", False)
     import logging
@@ -113,11 +47,7 @@ async def proxy_responses(request: Request):
     try:
         _stream_mode = chat_req.get("stream")
     except Exception as _e:
-        import json as _json, os as _os, traceback as _tb
-        _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
-        with open(_debug_log, 'a', encoding='utf-8') as _f:
-            _f.write(f"HANDLER ERROR: {_e}\n")
-            _tb.print_exc(file=_f)
+        import traceback as _tb
         return JSONResponse({"error": {"message": str(_e)}}, status_code=500)
 
     if _stream_mode:
@@ -142,14 +72,6 @@ async def proxy_responses(request: Request):
                 async for event in transcoder.transcode_stream(upstream_resp):
                     _events.append(event)
             except Exception as _e:
-                if config.debug:
-                                    # Log streaming error
-                                    try:
-                                        with open(_debug_log, 'a', encoding='utf-8') as _f:
-                                            _f.write(f"STREAM ERROR: {_e}\n")
-                                            import traceback as _tb
-                                            _tb.print_exc(file=_f)
-                                    except: pass
                 _events.append(transcoder._sse_event("response.failed", {
                     "type": "response.failed",
                     "response": {"id": transcoder._response_id, "status": "failed",
@@ -236,17 +158,6 @@ async def proxy_responses(request: Request):
             _translator.cache.store(response_id, msgs, body.get("model", "gpt-5.5"), transcoder.usage)
             # Record token usage
             if transcoder.usage is not None:
-                if config.debug:
-                                    # Log cache hit/miss to debug file
-                                    try:
-                                        cache_hit = transcoder.usage.get("prompt_cache_hit_tokens", 0)
-                                        cache_miss = transcoder.usage.get("prompt_cache_miss_tokens", 0)
-                                        total_prompt = transcoder.usage.get("prompt_tokens", 0)
-                                        with open(_debug_log, "a", encoding="utf-8") as _f:
-                                            _f.write(f"RESPONSE: prompt={total_prompt} cache_hit={cache_hit} cache_miss={cache_miss} "
-                                                     f"completion={transcoder.usage.get('completion_tokens', 0)} "
-                                                     f"total={transcoder.usage.get('total_tokens', 0)}\n")
-                                    except: pass
                 try:
                     rlog.finish(rlog.status, transcoder.usage)
                 except Exception:
