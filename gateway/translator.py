@@ -111,8 +111,8 @@ class ResponsesTranslator:
             chat_req["response_format"] = req["response_format"]
         if req.get("temperature") is not None:
             chat_req["temperature"] = req["temperature"]
-        # Default to 384K (393216) if not specified
-        chat_req["max_tokens"] = req.get("max_output_tokens", _DEFAULT_MAX_TOKENS)
+        if req.get("max_output_tokens"):
+            chat_req["max_tokens"] = req["max_output_tokens"]
         if req.get("top_p") is not None:
             chat_req["top_p"] = req["top_p"]
 
