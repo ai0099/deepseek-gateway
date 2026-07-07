@@ -3,12 +3,13 @@ Streaming and non-streaming paths.
 """
 
 import json
+import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from .config import load_config
+from .logger import RequestLog, detect_client_type
 from .translator import ResponsesTranslator
 from .upstream import stream_chat_completions, post_non_streaming
-from .logger import RequestLog, detect_client_type
 
 router = APIRouter()
 _translator = ResponsesTranslator()
@@ -34,10 +35,8 @@ async def proxy_responses(request: Request):
 
     chat_req, response_id, use_beta = _translator.translate_request(body)
 
-
     rlog.model = chat_req.get("model", "-")
     rlog.streaming = chat_req.get("stream", False)
-    import logging
     _log = logging.getLogger("gateway")
     _log.info("Responses req: model=%s stream=%s tools=%s input_items=%s msgs=%s",
               body.get("model"), body.get("stream"),
@@ -47,7 +46,6 @@ async def proxy_responses(request: Request):
     try:
         _stream_mode = chat_req.get("stream")
     except Exception as _e:
-        import traceback as _tb
         return JSONResponse({"error": {"message": str(_e)}}, status_code=500)
 
     if _stream_mode:

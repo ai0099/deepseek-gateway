@@ -9,8 +9,11 @@ Responses API SSE format:
 """
 
 import json
+import os as _os
 import uuid
 import time
+
+from .logger import rotate_log_file
 
 
 class SSETranscoder:
@@ -74,14 +77,13 @@ class SSETranscoder:
                     continue
                 # Log raw chunk for debugging usage/cache hit data
                 try:
-                    import os as _os2
-                    _raw_chunk_log = _os2.path.join(_os2.path.dirname(_os2.path.dirname(__file__)), 'raw_chunks.log')
+                    _raw_chunk_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'raw_chunks.log')
+                    rotate_log_file(_raw_chunk_log)
                     # Only log chunks with usage or specific patterns
                     if "usage" in chunk or "finish_reason" in str(chunk)[:200]:
                         with open(_raw_chunk_log, 'a', encoding='utf-8') as _rf:
-                            import json as _json2
-                            _rf.write(_json2.dumps(chunk, ensure_ascii=False) + '\n')
-                except: pass
+                            _rf.write(json.dumps(chunk, ensure_ascii=False) + '\n')
+                except Exception: pass
                 for event in self._process_chunk(chunk):
                     yield event
         except Exception as e:

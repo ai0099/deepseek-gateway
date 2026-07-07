@@ -1,21 +1,23 @@
-"""POST /anthropic/v1/messages — reverse-proxy to DeepSeek /anthropic endpoint.
-With model ID masquerade: claude-* names → real deepseek names, and reverse in responses.
+"""POST /anthropic/v1/messages and /v1/messages — Anthropic Messages API proxy to DeepSeek.
+Anthropic-format requests are forwarded to DeepSeek's /anthropic endpoint with
+model ID masquerade: claude-* ↔ deepseek-* names, with thinking always enabled
+and effort forced to xhigh.
 """
 
 import json
+import os as _os
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse, JSONResponse
-from .config import load_config
+from .config import load_config, MAX_TOOL_RESULT_CHARS, MAX_OUTPUT_TOKENS
 from .mapper import get_mapper
+from .logger import RequestLog, detect_client_type, rotate_log_file
 from .upstream import stream_anthropic, post_anthropic_non_streaming
-from .logger import RequestLog, detect_client_type
 from .cache_prefix import inject_prefix_anthropic
 
 router = APIRouter()
 
 # Anthropic SSE events that carry a "model" field (need masquerade on response)
 ANTHROPIC_MODEL_EVENTS = {"message_start"}
-from .config import MAX_TOOL_RESULT_CHARS, MAX_OUTPUT_TOKENS
 
 
 @router.api_route("/anthropic/v1/messages", methods=["POST", "OPTIONS"])
@@ -33,13 +35,13 @@ async def proxy_anthropic(request: Request):
     upstream_model = mapper.resolve_anthropic(client_model)
 
     # Log Anthropic request
-    import os as _os
     _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
+    rotate_log_file(_debug_log)
     try:
         with open(_debug_log, 'a', encoding='utf-8') as _f:
             _f.write(f"\n[ANTHROPIC] model={client_model} -> {upstream_model} stream={body.get('stream')} max_tokens={body.get('max_tokens')} msgs={len(body.get('messages',[]))}\n")
             _f.write(f"  thinking={body.get('thinking','N/A')} budget_tokens={body.get('budget_tokens','N/A')}\n")
-    except: pass
+    except Exception: pass
 
     body["model"] = upstream_model
     rlog.model = client_model
@@ -58,7 +60,7 @@ async def proxy_anthropic(request: Request):
             try:
                 with open(_debug_log, 'a', encoding='utf-8') as _f:
                     _f.write(f"  ANTHROPIC UPSTREAM ERROR: {_e}\n")
-            except: pass
+            except Exception: pass
             return JSONResponse({"error": {"message": str(_e)}}, status_code=502)
         return StreamingResponse(
             _sse_masquerade(upstream_resp, mapper),
@@ -80,7 +82,7 @@ async def proxy_anthropic(request: Request):
             try:
                 with open(_debug_log, 'a', encoding='utf-8') as _f:
                     _f.write(f"  ANTHROPIC UPSTREAM ERROR (non-streaming): {_e}\n")
-            except: pass
+            except Exception: pass
             return JSONResponse({"error": {"message": str(_e)}}, status_code=502)
         if "model" in upstream_json:
             upstream_json["model"] = mapper.reverse_anthropic(upstream_json["model"])
@@ -119,7 +121,7 @@ def _clean_anthropic_body(body: dict):
     if body.get("max_tokens", 0) > MAX_OUTPUT_TOKENS:
         body["max_tokens"] = MAX_OUTPUT_TOKENS
 
-    _fix_thinking_disabled(body)
+    _ensure_thinking_enabled(body)
     _enforce_max_effort(body)
 
     _truncate_tool_results(body.get("messages", []))
@@ -130,16 +132,17 @@ def _enforce_max_effort(body: dict):
     output_config = body.get("output_config")
     if not isinstance(output_config, dict):
         output_config = {}
-    output_config["effort"] = "max"
+    output_config["effort"] = "xhigh"
     body["output_config"] = output_config
 
 
-def _fix_thinking_disabled(body: dict):
-    """If thinking is explicitly disabled, flip it to enabled.
+def _ensure_thinking_enabled(body: dict):
+    """Force thinking to enabled on every request.
 
-    Claude Code sends thinking:{type:"disabled"} for sub-agents even when
-    CLAUDE_CODE_EFFORT_LEVEL=max is set.  This is a known conflict with
-    DeepSeek's /anthropic endpoint — reasoning_effort demands thinking on.
+    DeepSeek V4 ships with thinking enabled by default. This function
+    catches any client-side disable (Claude Code, OpenCode, etc.) and
+    re-enables it — DeepSeek's /anthropic endpoint requires thinking on
+    when reasoning_effort is set.
     """
     thinking = body.get("thinking")
     if not isinstance(thinking, dict):

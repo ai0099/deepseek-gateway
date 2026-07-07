@@ -1,10 +1,15 @@
-"""Pydantic models for all three API protocols used by the gateway."""
+"""Pydantic models for request/response schemas — kept as reference.
+
+Currently the gateway uses raw dicts (request.json()) instead of
+Pydantic validation for maximum throughput. Models here document
+the expected shapes of the three supported API protocols.
+"""
 
 from pydantic import BaseModel, Field
 
 
 # ═══════════════════════════════════════════
-# Anthropic Messages API
+# Anthropic Messages API (reference)
 # ═══════════════════════════════════════════
 
 class AnthropicRequest(BaseModel):
@@ -24,15 +29,8 @@ class AnthropicRequest(BaseModel):
 
 
 # ═══════════════════════════════════════════
-# OpenAI Chat Completions API
+# OpenAI Chat Completions API (reference)
 # ═══════════════════════════════════════════
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str | list[dict] | None = None
-    tool_calls: list[dict] | None = None
-    tool_call_id: str | None = None
-    name: str | None = None
 
 class ChatCompletionsRequest(BaseModel):
     model: str
@@ -47,7 +45,7 @@ class ChatCompletionsRequest(BaseModel):
 
 
 # ═══════════════════════════════════════════
-# OpenAI Responses API
+# OpenAI Responses API (reference)
 # ═══════════════════════════════════════════
 
 class ResponsesRequest(BaseModel):
@@ -64,20 +62,3 @@ class ResponsesRequest(BaseModel):
     top_p: float | None = None
     reasoning: dict | None = None
     parallel_tool_calls: bool | None = None
-
-
-class ResponsesResponse(BaseModel):
-    id: str = ""
-    object: str = "response"
-    status: str = "completed"
-    model: str = ""
-    output: list[dict] = []
-    usage: dict | None = None
-
-# Full response from upstream Chat Completions
-class ChatCompletionsResponse(BaseModel):
-    id: str = ""
-    object: str = "chat.completion"
-    model: str = ""
-    choices: list[dict] = []
-    usage: dict | None = None

@@ -100,7 +100,7 @@ class ResponsesTranslator:
         }
         # Always enable DeepSeek thinking mode with max effort
         chat_req["thinking"] = {"type": "enabled"}
-        chat_req["reasoning_effort"] = "max"
+        chat_req["reasoning_effort"] = "xhigh"
         # Request usage stats in streaming mode (for cache hit tracking)
         if stream_mode:
             chat_req["stream_options"] = {"include_usage": True}

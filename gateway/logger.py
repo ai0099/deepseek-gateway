@@ -72,6 +72,21 @@ class RequestLog:
                 pass
 
 
+def rotate_log_file(filepath: str, max_size: int = 10 * 1024 * 1024, backups: int = 3):
+    """Rotate log file if it exceeds max_size. Keeps up to `backups` old copies."""
+    import os as _os
+    try:
+        if _os.path.exists(filepath) and _os.path.getsize(filepath) > max_size:
+            for i in range(backups - 1, 0, -1):
+                old = f"{filepath}.{i}"
+                new = f"{filepath}.{i + 1}"
+                if _os.path.exists(old):
+                    _os.replace(old, new)
+            _os.replace(filepath, f"{filepath}.1")
+    except OSError:
+        pass
+
+
 def detect_client_type(request) -> str:
     ua = (request.headers.get("user-agent") or "").lower()
     accept = (request.headers.get("accept") or "").lower()
