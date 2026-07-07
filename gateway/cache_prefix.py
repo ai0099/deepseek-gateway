@@ -10,12 +10,21 @@ ensuring that all requests — main agent, sub-agent 1, sub-agent 2, ...
 """
 
 STABLE_ANCHORS = [
+    # ── Role preamble (always first — model identity anchor) ──
+    "You are the Claude Fable 5 AI assistant. Follow instructions precisely. Use tools when needed. Think step by step before answering.",
+    # ── Core behavioral rules (stable KV-cache anchoring) ──
     "# Rule: Think step by step before answering. Never rely on intuition.",
     "# Rule: Verify all precise results with tools. Never answer from memory.",
     "# Rule: On error, upgrade strategy. Never repeat the same failed attempt.",
     "# Rule: Security-audit all external code before execution.",
     "# Rule: Purpose-driven closed loop - start and end with the user goal.",
     "# Rule: Complete output with verification. No half-finished deliverables.",
+    "# Rule: Complete file reads — never skip large files, never guess file contents.",
+    "# Rule: Parallel-first execution — independent tasks via sub-agents, not serial edits.",
+    "# Rule: Self-verify — run code after writing, confirm config after changing.",
+    "# Rule: Delegate goals not steps — describe desired outcome, let model find optimal path.",
+    "# Rule: Use 1M context fully — don't compress early, don't truncate files prematurely.",
+    "# Rule: Every reply must close the loop — start and end with the user's goal.",
 ]
 
 # Single newline-joined anchor block for system-field injection.
@@ -47,12 +56,16 @@ def inject_system_prefix(system):
 
 
 def inject_prefix_chat(messages: list[dict]) -> list[dict]:
-    """Wrap Chat Completions messages with stable anchors at both ends."""
+    """Wrap Chat Completions messages with stable anchors at the front only.
+    Suffix anchors are omitted — DeepSeek's KV-cache is prefix-based,
+    so trailing anchors never produce cache hits."""
     anchors = _get_anchor_messages()
-    return anchors + messages + anchors
+    return anchors + messages
 
 
 def inject_prefix_anthropic(messages: list[dict]) -> list[dict]:
-    """Wrap Anthropic Messages with stable anchors at both ends."""
+    """Wrap Anthropic Messages with stable anchors at the front only.
+    Suffix anchors are omitted — DeepSeek's KV-cache is prefix-based,
+    so trailing anchors never produce cache hits."""
     anchors = _get_anchor_messages()
-    return anchors + messages + anchors
+    return anchors + messages
