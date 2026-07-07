@@ -12,7 +12,7 @@ from .config import load_config, MAX_TOOL_RESULT_CHARS, MAX_OUTPUT_TOKENS
 from .mapper import get_mapper
 from .logger import RequestLog, detect_client_type, rotate_log_file
 from .upstream import stream_anthropic, post_anthropic_non_streaming
-from .cache_prefix import inject_prefix_anthropic, inject_system_prefix
+from .cache_prefix import inject_system_prefix
 
 router = APIRouter()
 
@@ -48,9 +48,6 @@ async def proxy_anthropic(request: Request):
     rlog.streaming = body.get("stream", False)
 
     _clean_anthropic_body(body)
-
-    # Inject stable CLAUDE.md cache prefix for KV cache pooling across clients
-    body["messages"] = inject_prefix_anthropic(body.get("messages", []))
 
     if body.get("stream"):
         try:
