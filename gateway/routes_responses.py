@@ -173,13 +173,24 @@ async def proxy_responses(request: Request):
             },
         )
     else:
-        upstream_json = await post_non_streaming(
-            chat_req, config.beta_chat_completions_endpoint if use_beta else config.chat_completions_endpoint, config.deepseek_api_key
-        )
+        try:
+            upstream_json = await post_non_streaming(
+                chat_req, config.beta_chat_completions_endpoint if use_beta else config.chat_completions_endpoint, config.deepseek_api_key
+            )
+        except Exception as e:
+            error_msg = str(e)
+            rlog.finish(502)
+            return JSONResponse({
+                "error": {
+                    "message": f"Upstream error: {error_msg}",
+                    "type": "upstream_error",
+                },
+            }, status_code=502)
+
         result = _translator.translate_nonstreaming_response(
             upstream_json, body, body.get("model", "gpt-5.5"), response_id
         )
-        rlog.finish(200)
+        rlog.finish(200, _translator.last_usage if hasattr(_translator, 'last_usage') else None)
         return JSONResponse(result)
 
 
