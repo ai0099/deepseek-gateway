@@ -12,7 +12,7 @@ from .config import load_config, MAX_TOOL_RESULT_CHARS, MAX_OUTPUT_TOKENS
 from .mapper import get_mapper
 from .logger import RequestLog, detect_client_type, rotate_log_file
 from .upstream import stream_anthropic, post_anthropic_non_streaming
-from .cache_prefix import inject_prefix_anthropic
+from .cache_prefix import inject_prefix_anthropic, inject_system_prefix
 
 router = APIRouter()
 
@@ -114,7 +114,8 @@ async def _sse_masquerade(upstream_resp, mapper):
 
 
 def _clean_anthropic_body(body: dict):
-    """Apply safe limits, enforce max thinking effort, and fix sub-agent conflicts.
+    """Apply safe limits, enforce max thinking effort, fix sub-agent conflicts,
+    and inject stable KV-cache prefix into the system field.
 
     NOTE: mutates body dict in-place.
     """
@@ -123,6 +124,12 @@ def _clean_anthropic_body(body: dict):
 
     _ensure_thinking_enabled(body)
     _enforce_max_effort(body)
+
+    # Inject stable anchors into the system field so EVERY request
+    # (main agent + sub-agents) shares the same first ~100 tokens.
+    # Without this, sub-agents with different system prompts
+    # (tool defs + Agent prompt) would miss KV-cache from token 1.
+    body["system"] = inject_system_prefix(body.get("system"))
 
     _truncate_tool_results(body.get("messages", []))
 

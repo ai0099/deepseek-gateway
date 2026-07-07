@@ -1,8 +1,12 @@
-"""KV-cache-pooling prefix injection: 6 stable system-message anchors
-wrapped around every request so DeepSeek's disk cache hits reliably.
+"""KV-cache-pooling prefix injection: 6 stable anchor lines injected
+at the very start of every request (system field + messages array) so
+DeepSeek's disk cache hits reliably across main-agent and sub-agent
+requests — even when their system prompts differ (CLAUDE.md vs Agent
+tool definitions).
 
-No AGENTS.md injection — the 6 anchors alone provide enough stable
-prefix tokens for KV-cache pooling across sessions and clients.
+The anchors are the FIRST tokens in the effective prompt sequence,
+ensuring that all requests — main agent, sub-agent 1, sub-agent 2, ...
+— share an identical prefix regardless of what follows.
 """
 
 STABLE_ANCHORS = [
@@ -14,9 +18,32 @@ STABLE_ANCHORS = [
     "# Rule: Complete output with verification. No half-finished deliverables.",
 ]
 
+# Single newline-joined anchor block for system-field injection.
+# Used when system is a plain string; for list-form system we use
+# _get_anchor_messages().
+_ANCHOR_BLOCK = "\n".join(STABLE_ANCHORS)
+
 
 def _get_anchor_messages() -> list[dict]:
     return [{"role": "system", "content": a} for a in STABLE_ANCHORS]
+
+
+def inject_system_prefix(system):
+    """Prepend the stable anchor block to the system field.
+
+    Ensures the effective prompt prefix is identical across ALL
+    requests — main agent (CLAUDE.md system prompt) and sub-agents
+    (tool-definition system prompt) both start with the same tokens.
+    """
+    if system is None:
+        return _ANCHOR_BLOCK
+    if isinstance(system, str):
+        return _ANCHOR_BLOCK + "\n\n" + system
+    if isinstance(system, list):
+        anchors = [{"type": "text", "text": a} for a in STABLE_ANCHORS]
+        separator = [{"type": "text", "text": "\n\n"}]
+        return anchors + separator + system
+    return system
 
 
 def inject_prefix_chat(messages: list[dict]) -> list[dict]:
