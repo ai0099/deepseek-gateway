@@ -17,16 +17,10 @@ class Settings(BaseSettings):
     request_timeout: int = 300
     max_retries: int = 2
 
-    # 8 Claude model slots → real DeepSeek models (for Claude Desktop masquerade)
+    # Claude models → real DeepSeek models (for Claude Desktop masquerade)
     model_slots: dict = {
-        "claude-sonnet-4-20250514":    "deepseek-v4-pro[1m]",
-        "claude-opus-4-20250514":      "deepseek-v4-pro[1m]",
-        "claude-3-5-sonnet-20241022":  "deepseek-v4-pro[1m]",
-        "claude-3-opus-20240229":      "deepseek-v4-pro[1m]",
-        "claude-3-haiku-20240307":     "deepseek-v4-flash",
-        "claude-3-5-haiku-20241022":   "deepseek-v4-flash",
-        "claude-3-5-sonnet-20240620":  "deepseek-v4-pro[1m]",
-        "claude-3-sonnet-20240229":    "deepseek-v4-pro[1m]",
+        "claude-fable-5":              "deepseek-v4-pro[1m]",
+        "claude-fable-5[1m]":          "deepseek-v4-pro[1m]",
     }
 
     # Responses API model mapping (OpenAI model → DeepSeek model)

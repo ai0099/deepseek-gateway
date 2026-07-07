@@ -31,25 +31,34 @@ class ModelMapper:
         return list(self._slot_map.keys())
 
     def get_model_list(self) -> dict:
-        """Return OpenAI-format model list with 8 Claude model IDs."""
+        """Return OpenAI-format model list with [1m] suffix for 1M context window."""
         data = []
         created_at = 1686935002
-        for i, name in enumerate(self._slot_map.keys()):
+        seen: set[str] = set()
+        for name in self._slot_map.keys():
+            base = _strip_suffix(name)
+            if base in seen:
+                continue
+            seen.add(base)
+            display_name = base + "[1m]"
             data.append({
-                "id": name,
+                "id": display_name,
                 "object": "model",
-                "created": created_at + i,
+                "created": created_at + len(data),
                 "owned_by": "anthropic",
             })
         return {"object": "list", "data": data}
 
     def resolve_anthropic(self, client_model: str) -> str:
-        """claude-sonnet-4-20250514 → deepseek-v4-pro[1m]."""
-        return self._slot_map.get(client_model, self._slot_map.get(self.slot_names[0], "deepseek-v4-pro"))
+        """claude-sonnet-4-20250514[1m] → deepseek-v4-pro[1m] (strips [1m] suffix first)."""
+        base = _strip_suffix(client_model)
+        return self._slot_map.get(base, self._slot_map.get(self.slot_names[0], "deepseek-v4-pro"))
 
     def reverse_anthropic(self, upstream_model: str) -> str:
-        """deepseek-v4-pro → claude-sonnet-4-20250514 (first slot). Strips [1m] suffix."""
-        return self._reverse.get(_strip_suffix(upstream_model), self.slot_names[0])
+        """deepseek-v4-pro → claude-fable-5[1m]. Always appends [1m] suffix."""
+        base = self._reverse.get(_strip_suffix(upstream_model), self.slot_names[0])
+        base = _strip_suffix(base)
+        return base + "[1m]"
 
     # ── Responses API (Codex) ──
 
