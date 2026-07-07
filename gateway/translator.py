@@ -116,6 +116,15 @@ class ResponsesTranslator:
         if req.get("top_p") is not None:
             chat_req["top_p"] = req["top_p"]
 
+        # Sanitize: strip any input_image content from ALL messages
+        # (DeepSeek V4 Chat Completions only accepts text type)
+        for msg in messages:
+            if isinstance(msg.get("content"), list):
+                msg["content"] = [
+                    {"type": "text", "text": "[image]"} if c.get("type") == "input_image" else c
+                    for c in msg["content"]
+                ]
+
         # Determine if we need beta endpoint for strict-mode tools
         use_beta = any(t.get("strict") for t in (tools or []))
 
