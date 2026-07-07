@@ -63,9 +63,3 @@ def inject_prefix_chat(messages: list[dict]) -> list[dict]:
     return anchors + messages
 
 
-def inject_prefix_anthropic(messages: list[dict]) -> list[dict]:
-    """Wrap Anthropic Messages with stable anchors at the front only.
-    Suffix anchors are omitted — DeepSeek's KV-cache is prefix-based,
-    so trailing anchors never produce cache hits."""
-    anchors = _get_anchor_messages()
-    return anchors + messages

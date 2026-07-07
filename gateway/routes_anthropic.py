@@ -49,6 +49,14 @@ async def proxy_anthropic(request: Request):
 
     _clean_anthropic_body(body)
 
+    # Debug: log system field prefix + message count to verify anchor injection
+    system_preview = str(body.get("system", "N/A"))[:200].replace("\n", "\\n")
+    try:
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"  system[:200]={system_preview}\n")
+            _f.write(f"  msgs={len(body.get('messages',[]))} messages[0].role={body.get('messages', [{}])[0].get('role', 'N/A') if body.get('messages') else 'none'}\n")
+    except Exception: pass
+
     if body.get("stream"):
         try:
             upstream_resp = await stream_anthropic(body, f"{config.anthropic_endpoint}/v1/messages", config.deepseek_api_key)
