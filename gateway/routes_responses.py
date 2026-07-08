@@ -4,10 +4,11 @@ Streaming and non-streaming paths.
 
 import json
 import logging
+import os as _os
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from .config import load_config
-from .logger import RequestLog, detect_client_type
+from .logger import RequestLog, detect_client_type, rotate_log_file, trim_debug_log
 from .translator import ResponsesTranslator
 from .upstream import stream_chat_completions, post_non_streaming
 
@@ -37,6 +38,22 @@ async def proxy_responses(request: Request):
 
     rlog.model = chat_req.get("model", "-")
     rlog.streaming = chat_req.get("stream", False)
+
+    # Debug: log chat request info + token estimate
+    _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
+    rotate_log_file(_debug_log)
+    try:
+        client_model = body.get("model", "?")
+        upstream_model = chat_req.get("model", "?")
+        system_raw = str(chat_req.get("messages", []))
+        system_chars = len(system_raw)
+        total_est = int(system_chars * 0.35)
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"\n[RESPONSES] model={client_model} -> {upstream_model} stream={chat_req.get('stream')} msgs={len(chat_req.get('messages',[]))}\n")
+            _f.write(f"  UA: {(request.headers.get('user-agent') or 'none')[:200]}\n")
+            _f.write(f"  system_chars={system_chars:,} est_tokens={total_est:,}\n")
+    except Exception: pass
+
     _log = logging.getLogger("gateway")
     _log.info("Responses req: model=%s stream=%s tools=%s input_items=%s msgs=%s",
               body.get("model"), body.get("stream"),
@@ -160,6 +177,21 @@ async def proxy_responses(request: Request):
                     rlog.finish(rlog.status, transcoder.usage)
                 except Exception:
                     pass
+                # Debug: log cache performance
+                try:
+                    usage = transcoder.usage
+                    cache_hit = usage.get("prompt_cache_hit_tokens", 0) or usage.get("cache_read_input_tokens", 0)
+                    cache_miss = usage.get("prompt_cache_miss_tokens", 0) or usage.get("cache_creation_input_tokens", 0)
+                    total_in = usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
+                    total_out = usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)
+                    cache_msg = (
+                        f"  responses_usage: in={total_in/1e3:.1f}K out={total_out/1e3:.1f}K | "
+                        f"cache_hit={cache_hit/1e3:.1f}K cache_miss={cache_miss/1e3:.1f}K"
+                    )
+                    with open(_debug_log, 'a', encoding='utf-8') as _f:
+                        _f.write(cache_msg + "\n")
+                    trim_debug_log(_debug_log, keep_requests=10)
+                except Exception: pass
 
         return StreamingResponse(
             cached_stream(),
@@ -189,6 +221,22 @@ async def proxy_responses(request: Request):
             upstream_json, body, body.get("model", "gpt-5.5"), response_id
         )
         rlog.finish(200, _translator.last_usage if hasattr(_translator, 'last_usage') else None)
+        # Debug: log cache performance for non-streaming
+        try:
+            usage = _translator.last_usage if hasattr(_translator, 'last_usage') else {}
+            if usage:
+                cache_hit = usage.get("prompt_cache_hit_tokens", 0) or usage.get("cache_read_input_tokens", 0)
+                cache_miss = usage.get("prompt_cache_miss_tokens", 0) or usage.get("cache_creation_input_tokens", 0)
+                total_in = usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
+                total_out = usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)
+                cache_msg = (
+                    f"  responses_usage: in={total_in/1e3:.1f}K out={total_out/1e3:.1f}K | "
+                    f"cache_hit={cache_hit/1e3:.1f}K cache_miss={cache_miss/1e3:.1f}K"
+                )
+            with open(_debug_log, 'a', encoding='utf-8') as _f:
+                _f.write(cache_msg + "\n")
+        except Exception: pass
+        trim_debug_log(_debug_log, keep_requests=10)
         return JSONResponse(result)
 
 
