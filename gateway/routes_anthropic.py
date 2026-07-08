@@ -80,8 +80,11 @@ async def proxy_anthropic(request: Request):
                     _f.write(f"  ANTHROPIC UPSTREAM ERROR: {_e}\n")
             except Exception: pass
             return JSONResponse({"error": {"message": str(_e)}}, status_code=502)
+        # Fresh usage dict per request — must not be shared across requests
+        stream_usage: dict = {}
+
         return StreamingResponse(
-            _sse_masquerade(upstream_resp, mapper, _usage_capture := {}, _debug_log),
+            _sse_masquerade(upstream_resp, mapper, stream_usage, _debug_log),
             media_type="text/event-stream",
             headers={
                 "cache-control": "no-cache",
@@ -138,12 +141,20 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                     if "model" in data and not isinstance(data.get("message"), dict) and not isinstance(data.get("response"), dict):
                         data["model"] = mapper.reverse_anthropic(data["model"])
                 line = f"data: {json.dumps(data, ensure_ascii=False)}"
-                # Capture usage from message_delta or message_stop events for cache logging
+                # Capture usage from message_start (nested in message.usage) or
+                # message_delta / message_stop (top-level usage) for cache logging
                 if usage_capture is not None and event_type in ("message_delta", "message_stop"):
                     delta_usage = data.get("usage")
                     if isinstance(delta_usage, dict):
                         usage_capture.update(delta_usage)
                         usage_capture.setdefault("_event_type", event_type)
+                if usage_capture is not None and event_type == "message_start":
+                    msg = data.get("message")
+                    if isinstance(msg, dict):
+                        msg_usage = msg.get("usage")
+                        if isinstance(msg_usage, dict):
+                            usage_capture.update(msg_usage)
+                            usage_capture.setdefault("_event_type", event_type)
                 # Also try capturing from response-level usage (DeepSeek format)
                 resp = data.get("response")
                 if isinstance(resp, dict):
@@ -155,43 +166,47 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
         yield f"{line}\n"
 
     # After stream ends: log cache performance to debug log + token_usage.log
-    if usage_capture and debug_log:
+    if usage_capture is not None and debug_log:
+        import time as _time, json as _json
+        req_id = f"{_time.monotonic():.3f}"
         try:
-            # Anthropic SSE format: cache_read = hit, cache_creation = miss
-            cache_hit = usage_capture.get("cache_read_input_tokens", 0)
-            cache_miss = usage_capture.get("cache_creation_input_tokens", 0)
-            if not cache_hit and not cache_miss:
-                # Fallback: DeepSeek format
-                cache_hit = usage_capture.get("prompt_cache_hit_tokens", 0)
-                cache_miss = usage_capture.get("prompt_cache_miss_tokens", 0)
-            total_in = usage_capture.get("input_tokens", 0)
-            total_out = usage_capture.get("output_tokens", 0)
+            # Anthropic SSE format (message_start.usage or message_delta.usage):
+            #   input_tokens — uncached new input for this request
+            #   cache_read_input_tokens — tokens read from KV cache
+            #   cache_creation_input_tokens — ALWAYS 0 in Anthropic endpoint (not tracked)
+            #   output_tokens — model output
+            # Total prompt = input_tokens + cache_read_input_tokens
+            # Cache hit rate = cache_read / (cache_read + input_tokens) * 100
+            cache_hit  = usage_capture.get("cache_read_input_tokens", 0)
+            uncached   = usage_capture.get("input_tokens", 0)
+            total_out  = usage_capture.get("output_tokens", 0)
+            total_prompt = cache_hit + uncached
+            hit_pct = (cache_hit / total_prompt * 100) if total_prompt > 0 else 0
             evt = usage_capture.get("_event_type", "?")
-            if cache_hit or cache_miss:
-                total_prefixed = cache_hit + cache_miss
-                hit_rate = cache_hit / total_prefixed * 100 if total_prefixed > 0 else 0
-                cache_msg = (
-                    f"  stream_usage[{evt}]: in={total_in/1e3:.1f}K out={total_out/1e3:.1f}K | "
-                    f"cache_hit={cache_hit/1e3:.1f}K ({hit_rate:.0f}%) "
-                    f"cache_miss={cache_miss/1e3:.1f}K | "
-                    f"prefixed_total={total_prefixed/1e3:.1f}K"
-                )
-            else:
-                cache_msg = f"  stream_usage[{evt}]: (raw keys={sorted(usage_capture.keys())})"
+            cache_msg = (
+                f"  stream_usage[{req_id}]: prompt={total_prompt/1e3:.1f}K out={total_out/1e3:.1f}K | "
+                f"cached={cache_hit/1e3:.1f}K ({hit_pct:.0f}% hit) "
+                f"uncached={uncached/1e3:.1f}K | event={evt}"
+            )
             with open(debug_log, 'a', encoding='utf-8') as _f:
                 _f.write(cache_msg + "\n")
             # Also write to token_usage.log
-            if cache_hit or cache_miss:
-                import time as _time, json as _json
-                token_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'token_usage.log')
-                entry = {
-                    "time": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
-                    "client": "claude-code",
-                    "model": "deepseek-v4-pro",
-                    "usage": {**usage_capture, "prompt_cache_hit_tokens": cache_hit, "prompt_cache_miss_tokens": cache_miss},
-                }
-                with open(token_log, 'a', encoding='utf-8') as _f:
-                    _f.write(_json.dumps(entry) + "\n")
+            token_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'token_usage.log')
+            entry = {
+                "time": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+                "client": "claude-code",
+                "model": "deepseek-v4-pro",
+                "req_id": req_id,
+                "usage": {
+                    **usage_capture,
+                    "total_prompt": total_prompt,
+                    "cache_hit_pct": round(hit_pct, 1),
+                },
+            }
+            with open(token_log, 'a', encoding='utf-8') as _f:
+                _f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
         except Exception:
             pass
 
