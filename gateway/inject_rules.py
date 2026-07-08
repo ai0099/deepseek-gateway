@@ -78,7 +78,6 @@ _INJECTION_FILE_PATHS: list[_Path] = [
 ]
 
 _EXPECTED_FILE_NAMES = [p.name for p in _INJECTION_FILE_PATHS]
-_EXPECTED_SEPARATOR_COUNT = len(_INJECTION_FILE_PATHS) - 1  # 14 个文件 → 13 个分隔符
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -129,37 +128,34 @@ _build_injection_string()
 # ═══════════════════════════════════════════════════════════════════════════
 
 def verify_injection_order(system) -> tuple[bool, str]:
-    """验证 system 字段中我们的注入内容是否在最前面且顺序正确。
+    """验证 system 字段中我们的注入内容是否在最前面。
 
-    返回 (passed: bool, details: str)。
-    - 提取注入文本，检查前 _ANCHOR_LENGTH 字符的 SHA256
-    - 计数字段内的分隔符数量
+    对于 list-form system：提取 system[0].text，检查它是否以锚点 block 开头。
+    对于 string-form system：检查开头是否匹配锚点 block。
+
+    只验证锚点位置（SHA256），不计数分隔符——分隔符数量随文件内容变化。
     """
     injected_text = _extract_injected_text(system)
     if not injected_text:
         return False, "injection block not found in system field"
 
-    # 检查1：锚点 SHA256
+    # 检查：注入块的前 _ANCHOR_LENGTH 字符是否匹配锚点 SHA256
     prefix = injected_text[:_ANCHOR_LENGTH]
     actual_sha = _hashlib.sha256(prefix.encode("utf-8")).hexdigest()
-    anchor_ok = (actual_sha == _ANCHOR_SHA256)
-
-    # 检查2：分隔符数量
-    sep_count = injected_text.count(_SEPARATOR)
-    sep_ok = (sep_count == _EXPECTED_SEPARATOR_COUNT)
-
-    if anchor_ok and sep_ok:
-        return True, f"OK: anchors match, {sep_count} separators"
-    elif not anchor_ok and not sep_ok:
-        return False, f"MISMATCH: anchor SHA256 differs (expected {_ANCHOR_SHA256[:16]}..., got {actual_sha[:16]}...) AND separator count {sep_count} != {_EXPECTED_SEPARATOR_COUNT}"
-    elif not anchor_ok:
-        return False, f"MISMATCH: anchor SHA256 differs (expected {_ANCHOR_SHA256[:16]}..., got {actual_sha[:16]}...)"
-    else:
-        return False, f"MISMATCH: separator count {sep_count} != {_EXPECTED_SEPARATOR_COUNT}"
+    if actual_sha == _ANCHOR_SHA256:
+        return True, "OK: anchors in correct position"
+    return False, (
+        f"MISMATCH: anchor SHA256 differs "
+        f"(expected {_ANCHOR_SHA256[:16]}..., got {actual_sha[:16]}...)"
+    )
 
 
 def _extract_injected_text(system) -> str:
-    """从 system 字段中提取我们的注入文本块。"""
+    """从 system 字段中提取我们注入的文本块。
+
+    对于 list-form system：system[0] 是我们的注入块。
+    对于 string-form system：整个 string 以注入块开头。
+    """
     if isinstance(system, str):
         return system
     if isinstance(system, list) and len(system) > 0:

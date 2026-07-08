@@ -87,6 +87,46 @@ def rotate_log_file(filepath: str, max_size: int = 10 * 1024 * 1024, backups: in
         pass
 
 
+def trim_debug_log(filepath: str, keep_requests: int = 10):
+    """Keep only the last N request blocks in the debug log.
+
+    A request block starts with ``[ANTHROPIC]`` or ``[MIDDLEWARE]``.
+    Trims from the top, keeping the most recent entries.
+    """
+    import os as _os
+    try:
+        if not _os.path.exists(filepath):
+            return
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception:
+        return
+
+    # Split on request boundaries
+    lines = content.splitlines(keepends=True)
+    if not lines:
+        return
+
+    # Find all block start positions
+    block_starts = []
+    for i, line in enumerate(lines):
+        if line.startswith('[ANTHROPIC]') or line.startswith('[MIDDLEWARE]'):
+            block_starts.append(i)
+
+    if len(block_starts) <= keep_requests:
+        return
+
+    # Trim: keep everything from the Nth-last block start
+    trim_from = block_starts[-keep_requests]
+    trimmed = ''.join(lines[trim_from:])
+
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(trimmed)
+    except Exception:
+        pass
+
+
 def detect_client_type(request) -> str:
     ua = (request.headers.get("user-agent") or "").lower()
     accept = (request.headers.get("accept") or "").lower()

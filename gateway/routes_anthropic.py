@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from .config import load_config, MAX_TOOL_RESULT_CHARS, MAX_OUTPUT_TOKENS
 from .mapper import get_mapper
-from .logger import RequestLog, detect_client_type, rotate_log_file
+from .logger import RequestLog, detect_client_type, rotate_log_file, trim_debug_log
 from .upstream import stream_anthropic, post_anthropic_non_streaming
 from .cache_prefix import inject_system_prefix   # backwards compat — delegates to inject_rules
 from .inject_rules import verify_injection_order   # injection order verification
@@ -67,6 +67,8 @@ async def proxy_anthropic(request: Request):
             _f.write(f"  inject_order={inject_status}\n")
             _f.write(f"  msgs={len(body.get('messages',[]))} messages[0].role={body.get('messages', [{}])[0].get('role', 'N/A') if body.get('messages') else 'none'}\n")
     except Exception: pass
+
+    trim_debug_log(_debug_log, keep_requests=10)
 
     if body.get("stream"):
         try:
