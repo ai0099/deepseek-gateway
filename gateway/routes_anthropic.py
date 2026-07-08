@@ -143,6 +143,7 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                     delta_usage = data.get("usage")
                     if isinstance(delta_usage, dict):
                         usage_capture.update(delta_usage)
+                        usage_capture.setdefault("_event_type", event_type)
                 # Also try capturing from response-level usage (DeepSeek format)
                 resp = data.get("response")
                 if isinstance(resp, dict):
@@ -165,16 +166,18 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                 cache_miss = usage_capture.get("prompt_cache_miss_tokens", 0)
             total_in = usage_capture.get("input_tokens", 0)
             total_out = usage_capture.get("output_tokens", 0)
+            evt = usage_capture.get("_event_type", "?")
             if cache_hit or cache_miss:
-                total_cache = cache_hit + cache_miss
-                hit_rate = cache_hit / total_cache * 100 if total_cache > 0 else 0
+                total_prefixed = cache_hit + cache_miss
+                hit_rate = cache_hit / total_prefixed * 100 if total_prefixed > 0 else 0
                 cache_msg = (
-                    f"  stream_usage: in={total_in/1e3:.1f}K out={total_out/1e3:.1f}K | "
+                    f"  stream_usage[{evt}]: in={total_in/1e3:.1f}K out={total_out/1e3:.1f}K | "
                     f"cache_hit={cache_hit/1e3:.1f}K ({hit_rate:.0f}%) "
-                    f"cache_miss={cache_miss/1e3:.1f}K"
+                    f"cache_miss={cache_miss/1e3:.1f}K | "
+                    f"prefixed_total={total_prefixed/1e3:.1f}K"
                 )
             else:
-                cache_msg = f"  stream_usage: (raw keys={list(usage_capture.keys())})"
+                cache_msg = f"  stream_usage[{evt}]: (raw keys={sorted(usage_capture.keys())})"
             with open(debug_log, 'a', encoding='utf-8') as _f:
                 _f.write(cache_msg + "\n")
             # Also write to token_usage.log
