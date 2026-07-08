@@ -78,6 +78,8 @@ class RequestLog:
                 }
                 with open(token_log, "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                # Trim to last 50 lines
+                _trim_file_lines(token_log, 50)
             except Exception:
                 pass
 
@@ -97,7 +99,22 @@ def rotate_log_file(filepath: str, max_size: int = 10 * 1024 * 1024, backups: in
         pass
 
 
-def trim_debug_log(filepath: str, keep_requests: int = 10):
+def _trim_file_lines(filepath: str, keep_lines: int = 50):
+    """Keep only the last N lines of a file (for JSONL logs like token_usage.log)."""
+    import os as _os
+    try:
+        if not _os.path.exists(filepath):
+            return
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        if len(lines) > keep_lines:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.writelines(lines[-keep_lines:])
+    except Exception:
+        pass
+
+
+def trim_debug_log(filepath: str, keep_requests: int = 50):
     """Keep only the last N request blocks in the debug log.
 
     A request block starts with ``[ANTHROPIC]`` or ``[MIDDLEWARE]``.

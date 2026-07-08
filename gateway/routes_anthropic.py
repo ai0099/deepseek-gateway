@@ -68,7 +68,7 @@ async def proxy_anthropic(request: Request):
             _f.write(f"  msgs={len(body.get('messages',[]))} messages[0].role={body.get('messages', [{}])[0].get('role', 'N/A') if body.get('messages') else 'none'}\n")
     except Exception: pass
 
-    trim_debug_log(_debug_log, keep_requests=10)
+    trim_debug_log(_debug_log, keep_requests=50)
 
     if body.get("stream"):
         try:
@@ -205,8 +205,8 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
             }
             with open(token_log, 'a', encoding='utf-8') as _f:
                 _f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
+            from .logger import _trim_file_lines
+            _trim_file_lines(token_log, 50)
         except Exception:
             pass
 

@@ -210,7 +210,7 @@ async def proxy_responses(request: Request):
                     )
                     with open(_debug_log, 'a', encoding='utf-8') as _f:
                         _f.write(cache_msg + "\n")
-                    trim_debug_log(_debug_log, keep_requests=10)
+                    trim_debug_log(_debug_log, keep_requests=50)
                 except Exception: pass
 
         return StreamingResponse(
@@ -256,7 +256,7 @@ async def proxy_responses(request: Request):
             with open(_debug_log, 'a', encoding='utf-8') as _f:
                 _f.write(cache_msg + "\n")
         except Exception: pass
-        trim_debug_log(_debug_log, keep_requests=10)
+        trim_debug_log(_debug_log, keep_requests=50)
         return JSONResponse(result)
 
 
