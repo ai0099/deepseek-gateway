@@ -153,7 +153,7 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                 pass  # pass through non-JSON SSE lines
         yield f"{line}\n"
 
-    # After stream ends: log cache performance to debug log
+    # After stream ends: log cache performance to debug log + token_usage.log
     if usage_capture and debug_log:
         try:
             cache_hit = usage_capture.get("prompt_cache_hit_tokens", 0)
@@ -169,9 +169,21 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                     f"cache_miss={cache_miss/1e3:.1f}K"
                 )
             else:
-                cache_msg = "  stream_usage: (no cache data from upstream)"
+                cache_msg = f"  stream_usage: (raw keys={list(usage_capture.keys())})"
             with open(debug_log, 'a', encoding='utf-8') as _f:
                 _f.write(cache_msg + "\n")
+            # Also write to token_usage.log
+            if cache_hit or cache_miss:
+                import time as _time, json as _json
+                token_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'token_usage.log')
+                entry = {
+                    "timestamp": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+                    "client": "claude-code",
+                    "model": "deepseek-v4-pro",
+                    "usage": usage_capture,
+                }
+                with open(token_log, 'a', encoding='utf-8') as _f:
+                    _f.write(_json.dumps(entry) + "\n")
         except Exception:
             pass
 
