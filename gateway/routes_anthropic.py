@@ -81,7 +81,7 @@ async def proxy_anthropic(request: Request):
             except Exception: pass
             return JSONResponse({"error": {"message": str(_e)}}, status_code=502)
         return StreamingResponse(
-            _sse_masquerade(upstream_resp, mapper),
+            _sse_masquerade(upstream_resp, mapper, _usage_capture := {}, _debug_log),
             media_type="text/event-stream",
             headers={
                 "cache-control": "no-cache",
@@ -89,10 +89,6 @@ async def proxy_anthropic(request: Request):
                 "x-accel-buffering": "no",
             },
         )
-        try:
-            with open(_debug_log, 'a', encoding='utf-8') as _f:
-                _f.write(f"  ANTHROPIC -> {upstream_resp.status_code} (streaming)\n")
-        except: pass
     else:
         try:
             upstream_json = await post_anthropic_non_streaming(body, f"{config.anthropic_endpoint}/v1/messages", config.deepseek_api_key)
@@ -104,12 +100,28 @@ async def proxy_anthropic(request: Request):
             return JSONResponse({"error": {"message": str(_e)}}, status_code=502)
         if "model" in upstream_json:
             upstream_json["model"] = mapper.reverse_anthropic(upstream_json["model"])
-        rlog.finish(200)
+        rlog.finish(200, upstream_json.get("usage"))
+        # Log cache data to debug log for non-streaming requests
+        try:
+            usage = upstream_json.get("usage", {})
+            if usage:
+                cache_hit = usage.get("prompt_cache_hit_tokens", 0)
+                cache_miss = usage.get("prompt_cache_miss_tokens", 0)
+                cache_msg = (
+                    f"  usage: in={usage.get('input_tokens',0)/1e3:.1f}K out={usage.get('output_tokens',0)/1e3:.1f}K | "
+                    f"cache_hit={cache_hit/1e3:.1f}K cache_miss={cache_miss/1e3:.1f}K"
+                ) if (cache_hit or cache_miss) else "  usage: (no cache fields)"
+            with open(_debug_log, 'a', encoding='utf-8') as _f:
+                _f.write(cache_msg + "\n")
+        except Exception: pass
         return JSONResponse(upstream_json)
 
 
-async def _sse_masquerade(upstream_resp, mapper):
-    """Stream SSE bytes from upstream, replacing model ID in message_start events."""
+async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = None, debug_log: str = ""):
+    """Stream SSE bytes from upstream, replacing model ID in message_start events.
+
+    If usage_capture dict and debug_log are provided, cache usage is logged after streaming.
+    """
     async for line in upstream_resp.aiter_lines():
         if line.startswith("data: ") and len(line) > 6:
             data_str = line[6:]
@@ -126,9 +138,36 @@ async def _sse_masquerade(upstream_resp, mapper):
                     if "model" in data and not isinstance(data.get("message"), dict) and not isinstance(data.get("response"), dict):
                         data["model"] = mapper.reverse_anthropic(data["model"])
                 line = f"data: {json.dumps(data, ensure_ascii=False)}"
+                # Capture usage from message_delta events for cache logging
+                if usage_capture is not None and event_type == "message_delta":
+                    delta_usage = data.get("usage")
+                    if isinstance(delta_usage, dict):
+                        usage_capture.update(delta_usage)
             except json.JSONDecodeError:
                 pass  # pass through non-JSON SSE lines
         yield f"{line}\n"
+
+    # After stream ends: log cache performance to debug log
+    if usage_capture and debug_log:
+        try:
+            cache_hit = usage_capture.get("prompt_cache_hit_tokens", 0)
+            cache_miss = usage_capture.get("prompt_cache_miss_tokens", 0)
+            total_in = usage_capture.get("input_tokens", 0)
+            total_out = usage_capture.get("output_tokens", 0)
+            if cache_hit or cache_miss:
+                total_cache = cache_hit + cache_miss
+                hit_rate = cache_hit / total_cache * 100 if total_cache > 0 else 0
+                cache_msg = (
+                    f"  stream_usage: in={total_in/1e3:.1f}K out={total_out/1e3:.1f}K | "
+                    f"cache_hit={cache_hit/1e3:.1f}K ({hit_rate:.0f}%) "
+                    f"cache_miss={cache_miss/1e3:.1f}K"
+                )
+            else:
+                cache_msg = "  stream_usage: (no cache data from upstream)"
+            with open(debug_log, 'a', encoding='utf-8') as _f:
+                _f.write(cache_msg + "\n")
+        except Exception:
+            pass
 
 
 def _clean_anthropic_body(body: dict):
