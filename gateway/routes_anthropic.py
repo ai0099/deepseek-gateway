@@ -138,11 +138,17 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                     if "model" in data and not isinstance(data.get("message"), dict) and not isinstance(data.get("response"), dict):
                         data["model"] = mapper.reverse_anthropic(data["model"])
                 line = f"data: {json.dumps(data, ensure_ascii=False)}"
-                # Capture usage from message_delta events for cache logging
-                if usage_capture is not None and event_type == "message_delta":
+                # Capture usage from message_delta or message_stop events for cache logging
+                if usage_capture is not None and event_type in ("message_delta", "message_stop"):
                     delta_usage = data.get("usage")
                     if isinstance(delta_usage, dict):
                         usage_capture.update(delta_usage)
+                # Also try capturing from response-level usage (DeepSeek format)
+                resp = data.get("response")
+                if isinstance(resp, dict):
+                    resp_usage = resp.get("usage")
+                    if isinstance(resp_usage, dict):
+                        usage_capture.update(resp_usage)
             except json.JSONDecodeError:
                 pass  # pass through non-JSON SSE lines
         yield f"{line}\n"
