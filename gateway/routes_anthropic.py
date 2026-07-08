@@ -50,16 +50,21 @@ async def proxy_anthropic(request: Request):
 
     _clean_anthropic_body(body)
 
-    # Debug: log system field prefix + message count + token estimate
+    # Debug: log system field prefix + message count + token estimate + injection order
     system_raw = str(body.get("system", "N/A"))
     system_preview = system_raw[:10000].replace("\n", "\\n")
     system_chars = len(system_raw)
     msg_chars = len(str(body.get("messages", [])))
     total_est = int(system_chars * 0.35 + msg_chars * 0.3)
+
+    ok, inject_details = verify_injection_order(body.get("system"))
+    inject_status = "OK" if ok else f"MISMATCH: {inject_details}"
+
     try:
         with open(_debug_log, 'a', encoding='utf-8') as _f:
             _f.write(f"  system[:10000]={system_preview}\n")
             _f.write(f"  system_chars={system_chars:,} msgs_chars={msg_chars:,} est_total_tokens={total_est:,}\n")
+            _f.write(f"  inject_order={inject_status}\n")
             _f.write(f"  msgs={len(body.get('messages',[]))} messages[0].role={body.get('messages', [{}])[0].get('role', 'N/A') if body.get('messages') else 'none'}\n")
     except Exception: pass
 
@@ -139,14 +144,6 @@ def _clean_anthropic_body(body: dict):
     # Inject stable anchors + all rule files into the system field so EVERY
     # request (main agent + sub-agents) shares the same prefix for KV-cache.
     body["system"] = inject_system_prefix(body.get("system"))
-
-    # Verify injection order integrity
-    ok, details = verify_injection_order(body.get("system"))
-    if not ok:
-        try:
-            with open(_debug_log, 'a', encoding='utf-8') as _f:
-                _f.write(f"  ⚠️ INJECTION ORDER MISMATCH: {details}\n")
-        except Exception: pass
 
     _truncate_tool_results(body.get("messages", []))
 
