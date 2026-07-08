@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
         try:
             with open(_debug_log, 'a', encoding='utf-8') as _f:
                 _f.write(f"\n[MIDDLEWARE] {request.method} {request.url.path} from {request.client.host if request.client else '?'}\n")
+                _f.write(f"  UA: {request.headers.get('user-agent', 'none')[:200]}\n")
                 if request.query_params:
                     _f.write(f"  query: {dict(request.query_params)}\n")
         except Exception: pass

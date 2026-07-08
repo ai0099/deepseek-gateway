@@ -131,12 +131,18 @@ def detect_client_type(request) -> str:
     ua = (request.headers.get("user-agent") or "").lower()
     accept = (request.headers.get("accept") or "").lower()
 
+    # Primary: detect by API protocol (Accept header)
+    if "vnd.anthropic" in accept or "anthropic" in accept:
+        return "claude-code"
+    if "openai" in accept or "text/event-stream" in accept:
+        return "openai-client"
+
+    # Fallback: detect by User-Agent
     if "codex" in ua:
         return "codex-cli"
-    if "claude-code" in ua or "claude_code" in ua:
+    if "claude" in ua:
         return "claude-code"
-    if "vnd.anthropic" in accept:
-        return "claude-desktop"
-    if "openai" in ua or "codex" in ua:
-        return "codex-desktop"
+    if "github copilot" in ua or "copilot" in ua:
+        return "github-copilot"
+
     return "unknown"
