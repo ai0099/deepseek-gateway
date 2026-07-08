@@ -10,3 +10,4 @@ venv/
 dist/
 raw_request.json
 debug_requests.log.*
+raw_chunks.log.*

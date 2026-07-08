@@ -56,15 +56,25 @@ class RequestLog:
             f"{status} | {elapsed:.0f}ms{token_info}"
         )
         
-        # Write token usage to dedicated log file
+        # Write token usage to dedicated log file (with computed fields)
         if usage:
             token_log = Path(__file__).parent.parent / "token_usage.log"
             try:
+                import time as _time
+                cache_hit = usage.get("prompt_cache_hit_tokens", 0)
+                cache_miss = usage.get("prompt_cache_miss_tokens", 0)
+                total_prompt = (cache_hit + cache_miss) or usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
+                hit_pct = round(cache_hit / (cache_hit + cache_miss) * 100, 1) if (cache_hit + cache_miss) > 0 else 0
                 entry = {
                     "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                     "client": self.client_type,
                     "model": self.model,
-                    "usage": usage,
+                    "req_id": f"{_time.monotonic():.3f}",
+                    "usage": {
+                        **usage,
+                        "total_prompt": total_prompt,
+                        "cache_hit_pct": hit_pct,
+                    },
                 }
                 with open(token_log, "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
