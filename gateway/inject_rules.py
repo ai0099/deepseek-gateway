@@ -215,7 +215,15 @@ def get_anchor_messages() -> list[dict]:
     return [{"role": "system", "content": a} for a in STABLE_ANCHORS]
 
 
-def inject_prefix_chat(messages: list[dict]) -> list[dict]:
-    """Chat Completions 前缀注入。"""
-    system_msg = {"role": "system", "content": _INJECTION_STRING}
+def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> list[dict]:
+    """Chat Completions 前缀注入。
+
+    注入顺序：锚点 + 所有规则文件 + (可选) extra_content。
+    确保所有客户端（CLI + 桌面端）的 token 序列从相同的锚点开始，
+    从而共享 DeepSeek KV 缓存。
+    """
+    content = _INJECTION_STRING
+    if extra_content:
+        content = _INJECTION_STRING + "\n\n" + extra_content
+    system_msg = {"role": "system", "content": content}
     return [system_msg] + messages

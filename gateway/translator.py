@@ -38,9 +38,8 @@ class ResponsesTranslator:
         response_id = f"resp_{uuid.uuid4().hex[:12]}"
         messages: list[dict] = []
 
-        # instructions → system message (prepended)
-        if req.get("instructions"):
-            messages.append({"role": "system", "content": req["instructions"]})
+        # instructions → save as string, merge into injection prefix later
+        app_instructions = req.get("instructions", "") or ""
 
         # previous_response_id → recover history
         prev_id = req.get("previous_response_id")
@@ -89,8 +88,10 @@ class ResponsesTranslator:
         messages = self._merge_consecutive_tool_calls(messages)
         messages = self._fix_tool_call_continuity(messages)
 
-        # Inject stable AGENTS.md cache prefix for KV cache pooling across clients
-        messages = inject_prefix_chat(messages)
+        # Inject stable cache prefix + app instructions into a single system message.
+        # This ensures the token sequence ALWAYS starts with our 13 anchors,
+        # followed by rules, then app-specific instructions.
+        messages = inject_prefix_chat(messages, app_instructions)
 
         stream_mode = req.get("stream", False)
         chat_req = {
