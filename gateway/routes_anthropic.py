@@ -156,8 +156,13 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
     # After stream ends: log cache performance to debug log + token_usage.log
     if usage_capture and debug_log:
         try:
-            cache_hit = usage_capture.get("prompt_cache_hit_tokens", 0)
-            cache_miss = usage_capture.get("prompt_cache_miss_tokens", 0)
+            # Anthropic SSE format: cache_read = hit, cache_creation = miss
+            cache_hit = usage_capture.get("cache_read_input_tokens", 0)
+            cache_miss = usage_capture.get("cache_creation_input_tokens", 0)
+            if not cache_hit and not cache_miss:
+                # Fallback: DeepSeek format
+                cache_hit = usage_capture.get("prompt_cache_hit_tokens", 0)
+                cache_miss = usage_capture.get("prompt_cache_miss_tokens", 0)
             total_in = usage_capture.get("input_tokens", 0)
             total_out = usage_capture.get("output_tokens", 0)
             if cache_hit or cache_miss:
@@ -177,10 +182,10 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                 import time as _time, json as _json
                 token_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'token_usage.log')
                 entry = {
-                    "timestamp": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+                    "time": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
                     "client": "claude-code",
                     "model": "deepseek-v4-pro",
-                    "usage": usage_capture,
+                    "usage": {**usage_capture, "prompt_cache_hit_tokens": cache_hit, "prompt_cache_miss_tokens": cache_miss},
                 }
                 with open(token_log, 'a', encoding='utf-8') as _f:
                     _f.write(_json.dumps(entry) + "\n")
