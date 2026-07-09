@@ -32,14 +32,14 @@ class SSETranscoder:
         self._mapper = get_mapper()
 
     def _ensure_codex_model(self, model_name: str) -> str:
-        """Ensure model name is a Codex model (e.g. 'gpt-5.5'), not upstream DeepSeek name.
-
-        If model_name contains 'deepseek', reverse-map it via mapper.
-        Otherwise return as-is — already a Codex model name.
+        """Ensure model name is a Codex model (e.g. 'gpt-5.5[1m]') with [1m] suffix,
+        not upstream DeepSeek name. Always appends [1m] for 1M context window.
         """
         if isinstance(model_name, str) and "deepseek" in model_name.lower():
-            return self._mapper.reverse_responses(model_name)
-        return model_name
+            base = self._mapper.reverse_responses(model_name)
+        else:
+            base = model_name or "gpt-5.5"
+        return base + "[1m]" if not base.endswith("[1m]") else base
 
     def _reset(self):
         self._msg_id = f"msg_{uuid.uuid4().hex[:12]}"

@@ -52,6 +52,17 @@ class ModelMapper:
                 "created": created_at + len(data),
                 "owned_by": "anthropic",
             })
+        # Codex model names from responses_map
+        for name in self._responses_map.keys():
+            if name in seen:
+                continue
+            seen.add(name)
+            data.append({
+                "id": name,
+                "object": "model",
+                "created": created_at + len(data),
+                "owned_by": "openai",
+            })
         return {"object": "list", "data": data}
 
     def resolve_anthropic(self, client_model: str) -> str:

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # DeepSeek Chat Completions API (which does not support the suffix).
     responses_model_map: dict = {
         "gpt-5.5[1m]":                "deepseek-v4-pro",
+        "gpt-5.5[922k]":              "deepseek-v4-pro",
+        "gpt-5.5":                    "deepseek-v4-pro",
     }
 
     model_config = {"env_prefix": "DS_GW_", "env_file": ".env", "env_nested_delimiter": "__"}

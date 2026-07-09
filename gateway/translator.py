@@ -268,11 +268,12 @@ class ResponsesTranslator:
             flat_messages.append(assistant_msg)
         self.cache.store(response_id, flat_messages, model, chat_resp.get("usage", {}))
 
+        safe_model = model + "[1m]" if not model.endswith("[1m]") else model
         return {
             "id": response_id,
             "object": "response",
             "status": "completed",
-            "model": model,
+            "model": safe_model,
             "output": output,
             "usage": self._map_usage(chat_resp.get("usage")),
             "parallel_tool_calls": req_body.get("parallel_tool_calls", True),

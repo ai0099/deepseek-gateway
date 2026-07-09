@@ -269,13 +269,15 @@ async def proxy_responses(request: Request):
 async def get_response(response_id: str):
     cached = _translator.cache.lookup(response_id)
     if cached:
+        cached_model = cached.get("model", "gpt-5.5")
+        cached_model = cached_model + "[1m]" if not cached_model.endswith("[1m]") else cached_model
         return JSONResponse({
             "id": response_id,
             "object": "response",
             "status": "completed",
-            "model": cached.get("model", "gpt-5.5"),
+            "model": cached_model,
             "output": [],
             "usage": None,
         })
     return JSONResponse({"id": response_id, "object": "response", "status": "completed",
-                         "model": "gpt-5.5", "output": [], "usage": None})
+                         "model": "gpt-5.5[1m]", "output": [], "usage": None})
