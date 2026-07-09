@@ -8,7 +8,7 @@ import json
 import os as _os
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse, JSONResponse
-from .config import load_config, MAX_TOOL_RESULT_CHARS, MAX_OUTPUT_TOKENS
+from .config import load_config, MAX_OUTPUT_TOKENS
 from .mapper import get_mapper
 from .logger import RequestLog, detect_client_type, rotate_log_file, trim_debug_log
 from .upstream import stream_anthropic, post_anthropic_non_streaming
@@ -170,22 +170,15 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
         import time as _time, json as _json
         req_id = f"{_time.monotonic():.3f}"
         try:
-            # Anthropic SSE format (message_start.usage or message_delta.usage):
-            #   input_tokens — uncached new input for this request
-            #   cache_read_input_tokens — tokens read from KV cache
-            #   cache_creation_input_tokens — ALWAYS 0 in Anthropic endpoint (not tracked)
-            #   output_tokens — model output
-            # Total prompt = input_tokens + cache_read_input_tokens
-            # Cache hit rate = cache_read / (cache_read + input_tokens) * 100
             cache_hit  = usage_capture.get("cache_read_input_tokens", 0)
             uncached   = usage_capture.get("input_tokens", 0)
             total_out  = usage_capture.get("output_tokens", 0)
-            total_prompt = cache_hit + uncached
-            hit_pct = (cache_hit / total_prompt * 100) if total_prompt > 0 else 0
+            total_tokens = cache_hit + uncached
+            hit_rate = round(cache_hit / total_tokens * 100, 1) if total_tokens > 0 else 0
             evt = usage_capture.get("_event_type", "?")
             cache_msg = (
-                f"  stream_usage[{req_id}]: prompt={total_prompt/1e3:.1f}K out={total_out/1e3:.1f}K | "
-                f"cached={cache_hit/1e3:.1f}K ({hit_pct:.0f}% hit) "
+                f"  stream_usage[{req_id}]: total={total_tokens/1e3:.1f}K out={total_out/1e3:.1f}K | "
+                f"cached={cache_hit/1e3:.1f}K ({hit_rate:.0f}% hit) "
                 f"uncached={uncached/1e3:.1f}K | event={evt}"
             )
             with open(debug_log, 'a', encoding='utf-8') as _f:
@@ -197,16 +190,14 @@ async def _sse_masquerade(upstream_resp, mapper, usage_capture: dict | None = No
                 "client": "claude-code",
                 "model": "deepseek-v4-pro",
                 "req_id": req_id,
-                "usage": {
-                    **usage_capture,
-                    "total_prompt": total_prompt,
-                    "cache_hit_pct": round(hit_pct, 1),
-                },
+                "usage": {k: v for k, v in usage_capture.items() if not k.startswith("_")},
+                "total_tokens": total_tokens,
+                "hit_rate": hit_rate,
             }
             with open(token_log, 'a', encoding='utf-8') as _f:
                 _f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
             from .logger import _trim_file_lines
-            _trim_file_lines(token_log, 50)
+            _trim_file_lines(token_log, 200)
         except Exception:
             pass
 
@@ -226,8 +217,6 @@ def _clean_anthropic_body(body: dict):
     # Inject stable anchors + all rule files into the system field so EVERY
     # request (main agent + sub-agents) shares the same prefix for KV-cache.
     body["system"] = inject_system_prefix(body.get("system"))
-
-    _truncate_tool_results(body.get("messages", []))
 
 
 def _enforce_max_effort(body: dict):
@@ -263,41 +252,6 @@ def _ensure_thinking_enabled(body: dict):
     if isinstance(output_config, dict) and "effort" in output_config:
         # effort is set → keep it (it was conflicting with disabled; now fixed)
         pass
-
-
-def _truncate_tool_results(messages: list):
-    """Truncate tool_result content > MAX_TOOL_RESULT_CHARS to avoid upstream issues."""
-    for msg in messages:
-        if msg.get("role") != "user":
-            continue
-        content = msg.get("content")
-        if not isinstance(content, list):
-            continue
-        for block in content:
-            if block.get("type") != "tool_result":
-                continue
-            inner = block.get("content")
-            if isinstance(inner, str) and len(inner) > MAX_TOOL_RESULT_CHARS:
-                block["content"] = inner[:MAX_TOOL_RESULT_CHARS] + (
-                    f"\n...[truncated from {len(inner)} to {MAX_TOOL_RESULT_CHARS} chars by gateway]"
-                )
-            elif isinstance(inner, list):
-                total = sum(len(c.get("text", "")) for c in inner if isinstance(c, dict))
-                if total > MAX_TOOL_RESULT_CHARS:
-                    truncated = []
-                    remaining = MAX_TOOL_RESULT_CHARS
-                    for c in inner:
-                        if not isinstance(c, dict) or c.get("type") != "text":
-                            truncated.append(c)
-                            continue
-                        t = c.get("text", "")
-                        if len(t) <= remaining:
-                            truncated.append(c)
-                            remaining -= len(t)
-                        else:
-                            truncated.append({**c, "text": t[:remaining] + "\n...[truncated by gateway]"})
-                            break
-                    block["content"] = truncated
 
 
 def _cors_response():

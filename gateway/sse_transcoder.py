@@ -14,6 +14,7 @@ import uuid
 import time
 
 from .logger import rotate_log_file
+from .mapper import get_mapper
 
 
 class SSETranscoder:
@@ -28,6 +29,17 @@ class SSETranscoder:
         self.full_tool_calls: list[dict] = []
         self.usage: dict = {}
         self.web_search_calls: list[dict] = []
+        self._mapper = get_mapper()
+
+    def _ensure_codex_model(self, model_name: str) -> str:
+        """Ensure model name is a Codex model (e.g. 'gpt-5.5'), not upstream DeepSeek name.
+
+        If model_name contains 'deepseek', reverse-map it via mapper.
+        Otherwise return as-is — already a Codex model name.
+        """
+        if isinstance(model_name, str) and "deepseek" in model_name.lower():
+            return self._mapper.reverse_responses(model_name)
+        return model_name
 
     def _reset(self):
         self._msg_id = f"msg_{uuid.uuid4().hex[:12]}"
@@ -156,12 +168,13 @@ class SSETranscoder:
         self._sent_created = True
         self._state = "RESPONSE_STARTED"
         now = int(time.time())
+        safe_model = self._ensure_codex_model(self._model)
         return [
             self._sse_event("response.created", {
                 "type": "response.created",
                 "response": {
                     "id": self._response_id, "object": "response",
-                    "status": "in_progress", "model": self._model,
+                    "status": "in_progress", "model": safe_model,
                     "output": [], "usage": None, "created_at": now,
                 },
             }),
@@ -367,11 +380,12 @@ class SSETranscoder:
             })
 
         self._state = "COMPLETED"
+        safe_model = self._ensure_codex_model(self._model)
         res_obj = {
             "id": self._response_id,
             "object": "response",
             "status": "completed" if self._finish_reason != "length" else "incomplete",
-            "model": self._model,
+            "model": safe_model,
             "output": output_items,
             "usage": self._map_usage_sse(self.usage),
             "parallel_tool_calls": self._req_body.get("parallel_tool_calls", True),

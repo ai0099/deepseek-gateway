@@ -61,25 +61,29 @@ class RequestLog:
             token_log = Path(__file__).parent.parent / "token_usage.log"
             try:
                 import time as _time
-                cache_hit = usage.get("prompt_cache_hit_tokens", 0)
-                cache_miss = usage.get("prompt_cache_miss_tokens", 0)
-                total_prompt = (cache_hit + cache_miss) or usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
-                hit_pct = round(cache_hit / (cache_hit + cache_miss) * 100, 1) if (cache_hit + cache_miss) > 0 else 0
+                # Compute cache stats based on client type (different field names per API)
+                if self.client_type in ("claude-code", "anthropic"):
+                    cache_hit  = usage.get("cache_read_input_tokens", 0)
+                    cache_miss = usage.get("input_tokens", 0)
+                else:
+                    # openai-client, codex-cli, etc. (Chat Completions API)
+                    cache_hit  = usage.get("prompt_cache_hit_tokens", 0)
+                    cache_miss = usage.get("prompt_cache_miss_tokens", 0)
+                total_tokens = cache_hit + cache_miss
+                hit_rate = round(cache_hit / total_tokens * 100, 1) if total_tokens > 0 else 0
                 entry = {
                     "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                     "client": self.client_type,
                     "model": self.model,
                     "req_id": f"{_time.monotonic():.3f}",
-                    "usage": {
-                        **usage,
-                        "total_prompt": total_prompt,
-                        "cache_hit_pct": hit_pct,
-                    },
+                    "usage": dict(usage),
+                    "total_tokens": total_tokens,
+                    "hit_rate": hit_rate,
                 }
                 with open(token_log, "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
                 # Trim to last 50 lines
-                _trim_file_lines(token_log, 50)
+                _trim_file_lines(token_log, 200)
             except Exception:
                 pass
 

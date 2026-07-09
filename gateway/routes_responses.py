@@ -39,33 +39,38 @@ async def proxy_responses(request: Request):
     rlog.model = chat_req.get("model", "-")
     rlog.streaming = chat_req.get("stream", False)
 
-    # Debug: log chat request info + token estimate + injection verification
+    # ── Injection order verification (always runs) ──
+    client_model = body.get("model", "?")
+    upstream_model = chat_req.get("model", "?")
+    msgs = chat_req.get("messages", [])
+    # Find first system message content for injection verification
+    sys_content = ""
+    for m in msgs:
+        if m.get("role") == "system":
+            sys_content = str(m.get("content", ""))
+            break
+    system_chars = len(sys_content)
+    msg_chars = len(str(msgs))
+    total_est = int(system_chars * 0.35 + msg_chars * 0.3)
+
+    # Verify injection order (check anchor hash in first system message)
+    from .inject_rules import _ANCHOR_SHA256 as _ANCHOR_SHA, _ANCHOR_LENGTH
+    import hashlib as _hashlib
+    anchor_ok = False
+    if len(sys_content) >= _ANCHOR_LENGTH:
+        actual_sha = _hashlib.sha256(sys_content[:_ANCHOR_LENGTH].encode("utf-8")).hexdigest()
+        anchor_ok = (actual_sha == _ANCHOR_SHA)
+    inject_status = "OK" if anchor_ok else "MISMATCH"
+    if not anchor_ok:
+        _log = logging.getLogger("gateway")
+        _log.error("INJECTION MISMATCH on /v1/responses: anchor SHA256 differs! Expected %s..., got %s...",
+                   _ANCHOR_SHA[:16], actual_sha[:16] if len(sys_content) >= _ANCHOR_LENGTH else "N/A")
+
+    # Debug: log chat request info + token estimate
     _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
     rotate_log_file(_debug_log)
     try:
-        client_model = body.get("model", "?")
-        upstream_model = chat_req.get("model", "?")
-        msgs = chat_req.get("messages", [])
-        # Find first system message content for injection verification
-        sys_content = ""
-        for m in msgs:
-            if m.get("role") == "system":
-                sys_content = str(m.get("content", ""))
-                break
         system_preview = sys_content[:300].replace("\n", "\\n")
-        system_chars = len(sys_content)
-        msg_chars = len(str(msgs))
-        total_est = int(system_chars * 0.35 + msg_chars * 0.3)
-
-        # Verify injection order (check anchor hash in first system message)
-        from .inject_rules import _ANCHOR_SHA256 as _ANCHOR_SHA, _ANCHOR_LENGTH
-        import hashlib as _hashlib
-        anchor_ok = False
-        if len(sys_content) >= _ANCHOR_LENGTH:
-            actual_sha = _hashlib.sha256(sys_content[:_ANCHOR_LENGTH].encode("utf-8")).hexdigest()
-            anchor_ok = (actual_sha == _ANCHOR_SHA)
-        inject_status = "OK" if anchor_ok else "MISMATCH"
-
         with open(_debug_log, 'a', encoding='utf-8') as _f:
             _f.write(f"\n[RESPONSES] model={client_model} -> {upstream_model} stream={chat_req.get('stream')} msgs={len(msgs)}\n")
             _f.write(f"  UA: {(request.headers.get('user-agent') or 'none')[:200]}\n")

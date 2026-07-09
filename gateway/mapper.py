@@ -23,6 +23,11 @@ class ModelMapper:
             if base not in seen:
                 self._reverse[base] = claude_name
                 seen.add(base)
+        # Reverse: deepseek name → first Codex model name
+        self._reverse_responses: dict[str, str] = {}
+        for codex_name, ds_name in self._responses_map.items():
+            if ds_name not in self._reverse_responses:
+                self._reverse_responses[ds_name] = codex_name
 
     # ── Anthropic (Claude Desktop / Claude Code) ──
 
@@ -63,8 +68,15 @@ class ModelMapper:
     # ── Responses API (Codex) ──
 
     def resolve_responses(self, client_model: str) -> str:
-        """gpt-5.5 → deepseek-v4-pro. Falls back to first slot if unknown."""
-        return self._responses_map.get(client_model) or self._slot_map.get(self.slot_names[0], "deepseek-v4-pro")
+        """gpt-5.5[1m] → deepseek-v4-pro. Falls back to first slot if unknown.
+        Strips [1m] suffix from resolved model for DeepSeek Chat Completions API."""
+        result = self._responses_map.get(client_model) or self._slot_map.get(self.slot_names[0], "deepseek-v4-pro")
+        return _strip_suffix(result)
+
+    def reverse_responses(self, upstream_model: str) -> str:
+        """deepseek-v4-pro → gpt-5.5[1m]. Returns matching Codex model name."""
+        base = _strip_suffix(upstream_model)
+        return self._reverse_responses.get(base, "gpt-5.5[1m]")
 
 
 # Singleton
