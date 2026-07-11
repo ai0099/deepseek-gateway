@@ -25,6 +25,23 @@ async def proxy_responses(request: Request):
             "Access-Control-Allow-Headers": "*",
         })
 
+    try:
+        return await _proxy_responses_impl(request)
+    except Exception as _top_e:
+        import traceback as _tb, os as _os, logging as _logging
+        _log = _logging.getLogger("gateway")
+        _log.error("proxy_responses FATAL: %s\n%s", _top_e, _tb.format_exc())
+        # Also write to a dedicated crash log
+        try:
+            _crash = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "crash_responses.log")
+            with open(_crash, "a", encoding="utf-8") as _f:
+                _f.write(f"\n=== CRASH ===\n{_top_e}\n{_tb.format_exc()}\n")
+        except Exception: pass
+        return JSONResponse({"error": {"message": str(_top_e)}}, status_code=500)
+
+
+async def _proxy_responses_impl(request: Request):
+
     config = load_config()
     rlog = RequestLog("POST", "/v1/responses", detect_client_type(request))
 
@@ -33,6 +50,7 @@ async def proxy_responses(request: Request):
     except Exception as _e:
         return JSONResponse({"error": {"message": str(_e)}}, status_code=400)
 
+    try:
         chat_req, response_id, use_beta = _translator.translate_request(body)
     except Exception as _e:
         import traceback as _tb
