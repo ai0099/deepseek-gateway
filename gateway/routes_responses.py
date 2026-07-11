@@ -33,39 +33,6 @@ async def proxy_responses(request: Request):
     except Exception as _e:
         return JSONResponse({"error": {"message": str(_e)}}, status_code=400)
 
-    # DEBUG: log full request structure
-    try:
-        _debug_body = _os.path.join(_os.path.dirname(__file__), '..', 'debug_full_request.json')
-        import json as _j
-        # Only log first and last input items + tools info
-        summary = {
-            "model": body.get("model"),
-            "stream": body.get("stream"),
-            "keys": sorted(body.keys()),
-            "has_tools": "tools" in body,
-            "tools_count": len(body.get("tools") or []),
-            "input_count": len(body.get("input") or []),
-        }
-        # Log first 3 input items
-        inp = body.get("input") or []
-        for i, item in enumerate(inp[:3]):
-            summary[f"input[{i}]_type"] = item.get("type") if isinstance(item, dict) else str(type(item))
-            summary[f"input[{i}]_keys"] = sorted(item.keys()) if isinstance(item, dict) else "N/A"
-        # Log last input item too
-        if len(inp) > 3:
-            item = inp[-1]
-            summary[f"input[-1]_type"] = item.get("type") if isinstance(item, dict) else str(type(item))
-        # Check if any input item is an AdditionalTools/tool definition
-        tool_like_items = [i for i in inp if isinstance(i, dict) and i.get("type") in ("namespace", "additional_tool", "tool_definition")]
-        summary["tool_like_input_items"] = len(tool_like_items)
-        if tool_like_items:
-            summary["tool_like_sample"] = str(tool_like_items[0])[:500]
-        with open(_debug_body, 'a', encoding='utf-8') as _f:
-            _f.write("\n=== FULL REQUEST SUMMARY ===\n")
-            _f.write(_j.dumps(summary, ensure_ascii=False, indent=2) + "\n")
-    except Exception: pass
-
-    try:
         chat_req, response_id, use_beta = _translator.translate_request(body)
     except Exception as _e:
         import traceback as _tb
@@ -121,17 +88,6 @@ async def proxy_responses(request: Request):
               body.get("model"), body.get("stream"),
               len(body.get("tools") or []), len(body.get("input") or []),
               len(chat_req.get("messages") or []))
-    # DEBUG: log ALL tools being sent
-    import os as _osx, json as _jsx
-    _tdbg = _osx.path.join(_osx.path.dirname(_osx.path.dirname(__file__)), 'debug_all_tools.log')
-    with open(_tdbg, 'a', encoding='utf-8') as _fx:
-        _fx.write(f'\n=== REQ model={body.get("model")} stream={body.get("stream")} ===\n')
-        _fx.write(f'body.tools: {len(body.get("tools") or [])}\n')
-        _fx.write(f'chat_req.tools: {len(chat_req.get("tools") or [])}\n')
-        for _t in (chat_req.get("tools") or []):
-            _fn = _t.get("function", {})
-            _fx.write(f'  -> {_fn.get("name")} params={sorted(_fn.get("parameters",{}).get("properties",{}).keys())}\n')
-
     try:
         _stream_mode = chat_req.get("stream")
     except Exception as _e:
@@ -285,14 +241,6 @@ async def proxy_responses(request: Request):
             rlog.finish(500)
             return JSONResponse({"error": {"message": f"Streaming failed: {str(_stream_e)}"}}, status_code=500)
     else:
-        # DEBUG: log the chat_req being sent to DeepSeek
-        import json as _json2, os as _os2
-        _debug_sent = _os2.path.join(_os2.path.dirname(_os2.path.dirname(__file__)), 'debug_sent_req.json')
-        try:
-            with open(_debug_sent, 'w', encoding='utf-8') as _f2:
-                _f2.write(_json2.dumps(chat_req, ensure_ascii=False, indent=2))
-        except Exception: pass
-
         try:
             upstream_json = await post_non_streaming(
                 chat_req, config.beta_chat_completions_endpoint if use_beta else config.chat_completions_endpoint, config.deepseek_api_key

@@ -87,15 +87,6 @@ class SSETranscoder:
                     chunk = json.loads(data_str)
                 except json.JSONDecodeError:
                     continue
-                # Log raw chunk for debugging usage/cache hit data
-                try:
-                    _raw_chunk_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'raw_chunks.log')
-                    rotate_log_file(_raw_chunk_log)
-                    # Only log chunks with usage or specific patterns
-                    if "usage" in chunk or "finish_reason" in str(chunk)[:200]:
-                        with open(_raw_chunk_log, 'a', encoding='utf-8') as _rf:
-                            _rf.write(json.dumps(chunk, ensure_ascii=False) + '\n')
-                except Exception: pass
                 for event in self._process_chunk(chunk):
                     yield event
         except Exception as e:
@@ -157,10 +148,6 @@ class SSETranscoder:
 
         tc_deltas = delta.get("tool_calls")
         if tc_deltas:
-            import json as _js2, os as _os8
-            _dbg6 = _os8.path.join(_os8.path.dirname(_os8.path.dirname(__file__)), 'debug_sse_toolcalls.log')
-            with open(_dbg6, 'a', encoding='utf-8') as _f8:
-                _f8.write(f'  [chunk] finish_reason={finish_reason}, tool_calls_count={len(tc_deltas)}')
             events.extend(self._emit_tool_calls(tc_deltas))
 
         if finish_reason:
@@ -233,13 +220,6 @@ class SSETranscoder:
         return events
 
     def _emit_tool_calls(self, tc_deltas: list[dict]) -> list[str]:
-        import json as _js, os as _os7
-        _dbg5 = _os7.path.join(_os7.path.dirname(_os7.path.dirname(__file__)), 'debug_sse_toolcalls.log')
-        with open(_dbg5, 'a', encoding='utf-8') as _f7:
-            _f7.write(f'=== _emit_tool_calls: {len(tc_deltas)} deltas ===')
-            for _d in tc_deltas:
-                _fc = _d.get('function', {})
-                _f7.write(f'  idx={_d.get("index")}, id={_d.get("id","?")[:20]}, func.name={_fc.get("name","?")}, func.args_len={len(_fc.get("arguments",""))}')
         events: list[str] = []
         if self._state == "CONTENT_PART_OPEN":
             events.extend([

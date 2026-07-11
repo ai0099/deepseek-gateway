@@ -11,3 +11,8 @@ dist/
 raw_request.json
 debug_requests.log.*
 raw_chunks.log.*
+
+benchmark-results.json
+debug_full_request.json
+debug_sent_req.json
+test_quick.py

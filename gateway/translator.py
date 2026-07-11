@@ -49,9 +49,11 @@ def _sanitize_content_types(messages: list[dict]) -> list[dict]:
 
 
 def _parse_custom_format(fmt: dict, tool_name: str) -> dict | None:
-    """Custom tool grammar parsing is NOT used for function parameters.
-    The Lark grammar defines how Codex parses tool input, not the JSON Schema.
-    Always return None so the caller falls back to {'input': {'type': 'string'}}.
+    """Custom tool Lark grammar is NOT used for JSON Schema generation.
+
+    The Lark grammar defines how *Codex* parses tool input, not the JSON Schema
+    that DeepSeek needs. Always return None so _convert_tools falls back to
+    a simple {'input': {'type': 'string'}} parameter schema.
     """
     return None
 
@@ -84,17 +86,6 @@ class ResponsesTranslator:
         for _item in (req.get("input") or []):
             if isinstance(_item, dict) and _item.get("type") == "additional_tools":
                 _extracted_tools.extend(_item.get("tools") or [])
-        import json as _j5, os as _os5
-        _dbg3 = _os5.path.join(_os5.path.dirname(_os5.path.dirname(__file__)), 'debug_tool_extract.log')
-        with open(_dbg3, 'a', encoding='utf-8') as _f5:
-            _f5.write(f'\n=== additional_tools extraction ===\n')
-            _f5.write(f'  _extracted_tools count: {len(_extracted_tools)}\n')
-            for _et in _extracted_tools:
-                if isinstance(_et, dict):
-                    _f5.write(f'  type={_et.get("type")}, name={_et.get("name")}\n')
-                    # Dump full custom tool definition including format
-                    if _et.get("type") == "custom":
-                        _f5.write(f'  CUSTOM FULL: {_j5.dumps(_et, ensure_ascii=False)[:2000]}\n')
         if _extracted_tools:
             _existing = list(req.get("tools") or [])
             req = dict(req)
@@ -189,17 +180,6 @@ class ResponsesTranslator:
         chat_req["tool_choice"] = req.get("tool_choice", "auto")
         if tools:
             chat_req["tools"] = tools
-        import json as _j6, os as _os6
-        _dbg4 = _os6.path.join(_os6.path.dirname(_os6.path.dirname(__file__)), 'debug_chat_req.log')
-        with open(_dbg4, 'a', encoding='utf-8') as _f6:
-            _f6.write(f'=== translate_request output ===')
-            _f6.write(f'  model={chat_req.get("model")}')
-            _f6.write(f'  stream={chat_req.get("stream")}')
-            _f6.write(f'  tools_count={len(chat_req.get("tools") or [])}')
-            _f6.write(f'  msgs_count={len(chat_req.get("messages") or [])}')
-            _f6.write(f'  tool_choice={chat_req.get("tool_choice")}')
-            for _t in (chat_req.get("tools") or []):
-                _f6.write(f'  tool: {_t["function"]["name"]}')
         if req.get("response_format"):
             chat_req["response_format"] = req["response_format"]
         if req.get("temperature") is not None:
@@ -487,13 +467,6 @@ class ResponsesTranslator:
     def _convert_tools(self, tools: list[dict] | None) -> list[dict] | None:
         if not tools:
             return None
-        import json as _j3, os as _os3
-        _dbg = _os3.path.join(_os3.path.dirname(_os3.path.dirname(__file__)), 'debug_tool_convert.log')
-        with open(_dbg, 'a', encoding='utf-8') as _f3:
-            _f3.write(f'=== _convert_tools: {len(tools)} tools ===')
-            for _t in tools:
-                if isinstance(_t, dict):
-                    _f3.write(f'  type={_t.get("type")}, name={_t.get("name")}, keys={sorted(_t.keys())}')
         result = []
         seen_names: set[str] = set()
         for tool in tools:
@@ -581,10 +554,4 @@ class ResponsesTranslator:
                         "strict": tool.get("strict", False),
                     }
                 })
-        import json as _j4, os as _os4
-        _dbg2 = _os4.path.join(_os4.path.dirname(_os4.path.dirname(__file__)), 'debug_tool_convert.log')
-        with open(_dbg2, 'a', encoding='utf-8') as _f4:
-            _f4.write(f'  -> converted to {len(result)} functions:')
-            for _r in result:
-                _f4.write(f'     name={_r["function"]["name"]}, params_keys={sorted(_r["function"]["parameters"].get("properties",{}).keys())}')
         return result or None
