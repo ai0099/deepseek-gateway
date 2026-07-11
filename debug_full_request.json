@@ -8842,3 +8842,1851 @@
   "input[-1]_type": "function_call_output",
   "tool_like_input_items": 0
 }
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 338,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 343,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 347,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 350,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 353,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 357,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 357,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 357,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 357,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 360,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 363,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "message",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 367,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 370,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "message",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 376,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 376,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 376,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 376,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 376,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 376,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 377,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "message",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 380,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 383,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 388,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 394,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 398,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 402,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 406,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 410,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 413,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 416,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 420,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 424,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 427,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 431,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}
+
+=== FULL REQUEST SUMMARY ===
+{
+  "model": "gpt-5.6-sol",
+  "stream": true,
+  "keys": [
+    "client_metadata",
+    "include",
+    "input",
+    "model",
+    "parallel_tool_calls",
+    "prompt_cache_key",
+    "reasoning",
+    "store",
+    "stream",
+    "text",
+    "tool_choice"
+  ],
+  "has_tools": false,
+  "tools_count": 0,
+  "input_count": 434,
+  "input[0]_type": "additional_tools",
+  "input[0]_keys": [
+    "role",
+    "tools",
+    "type"
+  ],
+  "input[1]_type": "message",
+  "input[1]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[2]_type": "message",
+  "input[2]_keys": [
+    "content",
+    "role",
+    "type"
+  ],
+  "input[-1]_type": "function_call_output",
+  "tool_like_input_items": 0
+}

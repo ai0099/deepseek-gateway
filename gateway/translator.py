@@ -48,6 +48,75 @@ def _sanitize_content_types(messages: list[dict]) -> list[dict]:
     return clean
 
 
+def _parse_custom_format(fmt: dict, tool_name: str) -> dict | None:
+    """Parse a custom tool's format.definition (Lark grammar) into JSON Schema parameters.
+    
+    Lark grammar lines look like:
+        field_name: TYPE
+        field_name: TYPE | TYPE2
+        optional_field?: TYPE
+    
+    Returns None if parsing fails (caller should fall back to mock params).
+    """
+    definition = ""
+    if isinstance(fmt, dict):
+        # format.type == "lark" or similar
+        definition = str(fmt.get("definition", "") or "")
+    if not definition:
+        return None
+    
+    # If the definition contains quoted strings, LF tokens, or regex patterns,
+    # it's a complex grammar (not simple field:type declarations).
+    # For tools like apply_patch/exec, the grammar is for parsing the input,
+    # not for defining function parameters. Fall back to simple params.
+    import re
+    if '"' in definition or "'" in definition or 'LF' in definition or '/(' in definition:
+        return None
+    
+    import re
+    # Lark type mapping to JSON Schema
+    TYPE_MAP = {
+        "STRING": {"type": "string"},
+        "NUMBER": {"type": "number"},
+        "INTEGER": {"type": "integer"},
+        "INT": {"type": "integer"},
+        "BOOLEAN": {"type": "boolean"},
+        "BOOL": {"type": "boolean"},
+        "FLOAT": {"type": "number"},
+    }
+    
+    properties = {}
+    required: list[str] = []
+    
+    # Lines like:  field_name: TYPE   or   field_name: TYPE | TYPE2   or   field_name?: TYPE
+    rule_pattern = re.compile(
+        r'^\s*(\w+)(\?)?\s*:\s*(.+?)\s*$', re.MULTILINE
+    )
+    
+    for match in rule_pattern.finditer(definition):
+        field = match.group(1)
+        optional = match.group(2) == "?"
+        types_str = match.group(3).strip()
+        
+        # Take the first type alternative (e.g. "STRING | NUMBER" → "STRING")
+        first_type = types_str.split("|")[0].strip().upper()
+        
+        schema = TYPE_MAP.get(first_type, {"type": "string"})
+        properties[field] = {"type": schema["type"], "description": f"{tool_name} argument: {field}"}
+        if not optional:
+            required.append(field)
+    
+    if not properties:
+        return None
+    
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }
+
+
 class ResponsesTranslator:
     def __init__(self):
         self._mapper = get_mapper()
@@ -80,11 +149,14 @@ class ResponsesTranslator:
         import json as _j5, os as _os5
         _dbg3 = _os5.path.join(_os5.path.dirname(_os5.path.dirname(__file__)), 'debug_tool_extract.log')
         with open(_dbg3, 'a', encoding='utf-8') as _f5:
-            _f5.write(f'=== additional_tools extraction ===')
-            _f5.write(f'  _extracted_tools count: {len(_extracted_tools)}')
+            _f5.write(f'\n=== additional_tools extraction ===\n')
+            _f5.write(f'  _extracted_tools count: {len(_extracted_tools)}\n')
             for _et in _extracted_tools:
                 if isinstance(_et, dict):
-                    _f5.write(f'  type={_et.get("type")}, name={_et.get("name")}')
+                    _f5.write(f'  type={_et.get("type")}, name={_et.get("name")}\n')
+                    # Dump full custom tool definition including format
+                    if _et.get("type") == "custom":
+                        _f5.write(f'  CUSTOM FULL: {_j5.dumps(_et, ensure_ascii=False)[:2000]}\n')
         if _extracted_tools:
             _existing = list(req.get("tools") or [])
             req = dict(req)
@@ -512,17 +584,29 @@ class ResponsesTranslator:
                     }
                 })
             elif ttype == "custom":
+                # custom tools have format.definition (Lark grammar) — parse it to
+                # generate proper JSON Schema so DeepSeek outputs structured args
+                fmt = tool.get("format", {})
+                custom_params = _parse_custom_format(fmt, name)
+                if custom_params is None:
+                    # Fallback: use parameters if present, else single input field
+                    custom_params = tool.get("parameters")
+                    if not isinstance(custom_params, dict) or not custom_params.get("properties"):
+                        custom_params = {
+                            "type": "object",
+                            "properties": {"input": {"type": "string", "description": tool.get("description", "")}},
+                            "required": ["input"],
+                            "additionalProperties": False,
+                        }
+                    elif isinstance(custom_params, dict):
+                        custom_params = dict(custom_params)
+                        custom_params["additionalProperties"] = False
                 result.append({
                     "type": "function",
                     "function": {
                         "name": name,
                         "description": tool.get("description", ""),
-                        "parameters": {
-                            "type": "object",
-                            "properties": {"input": {"type": "string"}},
-                            "required": ["input"],
-                            "additionalProperties": False,
-                        },
+                        "parameters": custom_params,
                         "strict": tool.get("strict", False),
                     }
                 })
