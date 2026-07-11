@@ -7,7 +7,7 @@
     },
     {
       "role": "user",
-      "content": "say hi"
+      "content": "hello"
     }
   ],
   "stream": false,
@@ -20,8 +20,8 @@
     {
       "type": "function",
       "function": {
-        "name": "shell_command",
-        "description": "run shell",
+        "name": "test",
+        "description": "test tool",
         "parameters": {
           "type": "object",
           "properties": {},
@@ -34,17 +34,148 @@
     {
       "type": "function",
       "function": {
+        "name": "shell_command",
+        "description": "Run a PowerShell command on Windows",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "PowerShell command to execute"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        "strict": false
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "apply_patch",
-        "description": "edit files",
+        "description": "Apply a patch to edit files using FREEFORM syntax",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "description": "Patch content in *** Begin Patch / *** End Patch format"
+            }
+          },
+          "required": [
+            "input"
+          ],
+          "additionalProperties": false
+        },
+        "strict": false
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "view_image",
+        "description": "View a local image file",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to image file"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        "strict": false
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_goal",
+        "description": "Get current goal status",
         "parameters": {
           "type": "object",
           "properties": {},
-          "required": [],
           "additionalProperties": false
+        },
+        "strict": false
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_goal",
+        "description": "Create a new goal",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "objective": {
+              "type": "string",
+              "description": "Goal objective"
+            }
+          },
+          "required": [
+            "objective"
+          ],
+          "additionalProperties": false
+        },
+        "strict": false
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "update_goal",
+        "description": "Update goal status",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "complete",
+                "blocked"
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        "strict": false
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "update_plan",
+        "description": "Update task plan",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "explanation": {
+              "type": "string"
+            },
+            "plan": {
+              "type": "array"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "explanation",
+            "plan"
+          ]
         },
         "strict": false
       }
     }
   ],
-  "max_tokens": 50
+  "max_tokens": 30
 }

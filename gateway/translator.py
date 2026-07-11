@@ -110,9 +110,12 @@ class ResponsesTranslator:
             {"type": "function", "name": "update_goal", "description": "Update goal status", "parameters": {"type": "object", "properties": {"status": {"type": "string", "enum": ["complete", "blocked"]}}, "required": ["status"], "additionalProperties": False}},
             {"type": "function", "name": "update_plan", "description": "Update task plan", "parameters": {"type": "object", "properties": {"explanation": {"type": "string"}, "plan": {"type": "array"}}, "additionalProperties": False}},
         ]
+        # Only inject system tools when Codex already sent some tools
+        # (i.e. this is a tool-using conversation, not a plain chat)
         _existing_all = list(req.get("tools") or [])
-        req = dict(req)
-        req["tools"] = _existing_all + _SYSTEM_TOOLS
+        if _existing_all or _extracted_tools:
+            req = dict(req)
+            req["tools"] = _existing_all + _SYSTEM_TOOLS
 
         # input items → messages (re-read after possible req modification)
         input_data = req.get("input", [])
