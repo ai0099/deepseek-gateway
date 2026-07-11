@@ -121,6 +121,16 @@ async def proxy_responses(request: Request):
               body.get("model"), body.get("stream"),
               len(body.get("tools") or []), len(body.get("input") or []),
               len(chat_req.get("messages") or []))
+    # DEBUG: log ALL tools being sent
+    import os as _osx, json as _jsx
+    _tdbg = _osx.path.join(_osx.path.dirname(_osx.path.dirname(__file__)), 'debug_all_tools.log')
+    with open(_tdbg, 'a', encoding='utf-8') as _fx:
+        _fx.write(f'\n=== REQ model={body.get("model")} stream={body.get("stream")} ===\n')
+        _fx.write(f'body.tools: {len(body.get("tools") or [])}\n')
+        _fx.write(f'chat_req.tools: {len(chat_req.get("tools") or [])}\n')
+        for _t in (chat_req.get("tools") or []):
+            _fn = _t.get("function", {})
+            _fx.write(f'  -> {_fn.get("name")} params={sorted(_fn.get("parameters",{}).get("properties",{}).keys())}\n')
 
     try:
         _stream_mode = chat_req.get("stream")

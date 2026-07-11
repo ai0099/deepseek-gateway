@@ -49,73 +49,11 @@ def _sanitize_content_types(messages: list[dict]) -> list[dict]:
 
 
 def _parse_custom_format(fmt: dict, tool_name: str) -> dict | None:
-    """Parse a custom tool's format.definition (Lark grammar) into JSON Schema parameters.
-    
-    Lark grammar lines look like:
-        field_name: TYPE
-        field_name: TYPE | TYPE2
-        optional_field?: TYPE
-    
-    Returns None if parsing fails (caller should fall back to mock params).
+    """Custom tool grammar parsing is NOT used for function parameters.
+    The Lark grammar defines how Codex parses tool input, not the JSON Schema.
+    Always return None so the caller falls back to {'input': {'type': 'string'}}.
     """
-    definition = ""
-    if isinstance(fmt, dict):
-        # format.type == "lark" or similar
-        definition = str(fmt.get("definition", "") or "")
-    if not definition:
-        return None
-    
-    # If the definition contains quoted strings, LF tokens, or regex patterns,
-    # it's a complex grammar (not simple field:type declarations).
-    # For tools like apply_patch/exec, the grammar is for parsing the input,
-    # not for defining function parameters. Fall back to simple params.
-    import re
-    if '"' in definition or "'" in definition or 'LF' in definition or '/(' in definition:
-        return None
-    
-    import re
-    # Lark type mapping to JSON Schema
-    TYPE_MAP = {
-        "STRING": {"type": "string"},
-        "NUMBER": {"type": "number"},
-        "INTEGER": {"type": "integer"},
-        "INT": {"type": "integer"},
-        "BOOLEAN": {"type": "boolean"},
-        "BOOL": {"type": "boolean"},
-        "FLOAT": {"type": "number"},
-    }
-    
-    properties = {}
-    required: list[str] = []
-    
-    # Lines like:  field_name: TYPE   or   field_name: TYPE | TYPE2   or   field_name?: TYPE
-    rule_pattern = re.compile(
-        r'^\s*(\w+)(\?)?\s*:\s*(.+?)\s*$', re.MULTILINE
-    )
-    
-    for match in rule_pattern.finditer(definition):
-        field = match.group(1)
-        optional = match.group(2) == "?"
-        types_str = match.group(3).strip()
-        
-        # Take the first type alternative (e.g. "STRING | NUMBER" → "STRING")
-        first_type = types_str.split("|")[0].strip().upper()
-        
-        schema = TYPE_MAP.get(first_type, {"type": "string"})
-        properties[field] = {"type": schema["type"], "description": f"{tool_name} argument: {field}"}
-        if not optional:
-            required.append(field)
-    
-    if not properties:
-        return None
-    
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": required,
-        "additionalProperties": False,
-    }
-
+    return None
 
 class ResponsesTranslator:
     def __init__(self):
@@ -161,6 +99,20 @@ class ResponsesTranslator:
             _existing = list(req.get("tools") or [])
             req = dict(req)
             req["tools"] = _existing + _extracted_tools
+        
+        # Inject missing system tools that Codex doesn't send in GPT-5.6 additional_tools
+        _SYSTEM_TOOLS = [
+            {"type": "function", "name": "shell_command", "description": "Run a PowerShell command on Windows", "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "PowerShell command to execute"}}, "required": ["command"], "additionalProperties": False}},
+            {"type": "function", "name": "apply_patch", "description": "Apply a patch to edit files using FREEFORM syntax", "parameters": {"type": "object", "properties": {"input": {"type": "string", "description": "Patch content in *** Begin Patch / *** End Patch format"}}, "required": ["input"], "additionalProperties": False}},
+            {"type": "function", "name": "view_image", "description": "View a local image file", "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "Path to image file"}}, "required": ["path"], "additionalProperties": False}},
+            {"type": "function", "name": "get_goal", "description": "Get current goal status", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
+            {"type": "function", "name": "create_goal", "description": "Create a new goal", "parameters": {"type": "object", "properties": {"objective": {"type": "string", "description": "Goal objective"}}, "required": ["objective"], "additionalProperties": False}},
+            {"type": "function", "name": "update_goal", "description": "Update goal status", "parameters": {"type": "object", "properties": {"status": {"type": "string", "enum": ["complete", "blocked"]}}, "required": ["status"], "additionalProperties": False}},
+            {"type": "function", "name": "update_plan", "description": "Update task plan", "parameters": {"type": "object", "properties": {"explanation": {"type": "string"}, "plan": {"type": "array"}}, "additionalProperties": False}},
+        ]
+        _existing_all = list(req.get("tools") or [])
+        req = dict(req)
+        req["tools"] = _existing_all + _SYSTEM_TOOLS
 
         # input items → messages (re-read after possible req modification)
         input_data = req.get("input", [])
