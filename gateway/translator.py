@@ -24,6 +24,30 @@ class ResponseCache:
         return self._cache.get(response_id)
 
 
+def _sanitize_content_types(messages: list[dict]) -> list[dict]:
+    """DeepSeek Chat Completions only accepts {"type":"text"} in content arrays.
+    Convert any "input_text" or "output_text" (Responses API types) to "text"."""
+    import copy as _copy
+    clean = []
+    for msg in messages:
+        m = msg
+        content = m.get("content")
+        if isinstance(content, list):
+            new_parts = []
+            for part in content:
+                if not isinstance(part, dict):
+                    new_parts.append(part)
+                    continue
+                ptype = part.get("type", "")
+                if ptype in ("input_text", "output_text"):
+                    new_parts.append({"type": "text", "text": str(part.get("text", ""))})
+                else:
+                    new_parts.append(part)
+            m = {**m, "content": new_parts}
+        clean.append(m)
+    return clean
+
+
 class ResponsesTranslator:
     def __init__(self):
         self._mapper = get_mapper()
@@ -53,6 +77,14 @@ class ResponsesTranslator:
         for _item in (req.get("input") or []):
             if isinstance(_item, dict) and _item.get("type") == "additional_tools":
                 _extracted_tools.extend(_item.get("tools") or [])
+        import json as _j5, os as _os5
+        _dbg3 = _os5.path.join(_os5.path.dirname(_os5.path.dirname(__file__)), 'debug_tool_extract.log')
+        with open(_dbg3, 'a', encoding='utf-8') as _f5:
+            _f5.write(f'=== additional_tools extraction ===')
+            _f5.write(f'  _extracted_tools count: {len(_extracted_tools)}')
+            for _et in _extracted_tools:
+                if isinstance(_et, dict):
+                    _f5.write(f'  type={_et.get("type")}, name={_et.get("name")}')
         if _extracted_tools:
             _existing = list(req.get("tools") or [])
             req = dict(req)
@@ -105,9 +137,13 @@ class ResponsesTranslator:
         messages = inject_prefix_chat(messages, app_instructions)
 
         stream_mode = req.get("stream", False)
+        # Sanitize all messages before sending to DeepSeek:
+        # DeepSeek Chat Completions only accepts {"type":"text"} content parts,
+        # not "input_text" or "output_text" (Responses API types).
+        clean_messages = _sanitize_content_types(messages)
         chat_req = {
             "model": upstream_model,
-            "messages": messages,
+            "messages": clean_messages,
             "stream": stream_mode,
         }
         # Always enable DeepSeek thinking mode
@@ -126,6 +162,17 @@ class ResponsesTranslator:
         chat_req["tool_choice"] = req.get("tool_choice", "auto")
         if tools:
             chat_req["tools"] = tools
+        import json as _j6, os as _os6
+        _dbg4 = _os6.path.join(_os6.path.dirname(_os6.path.dirname(__file__)), 'debug_chat_req.log')
+        with open(_dbg4, 'a', encoding='utf-8') as _f6:
+            _f6.write(f'=== translate_request output ===')
+            _f6.write(f'  model={chat_req.get("model")}')
+            _f6.write(f'  stream={chat_req.get("stream")}')
+            _f6.write(f'  tools_count={len(chat_req.get("tools") or [])}')
+            _f6.write(f'  msgs_count={len(chat_req.get("messages") or [])}')
+            _f6.write(f'  tool_choice={chat_req.get("tool_choice")}')
+            for _t in (chat_req.get("tools") or []):
+                _f6.write(f'  tool: {_t["function"]["name"]}')
         if req.get("response_format"):
             chat_req["response_format"] = req["response_format"]
         if req.get("temperature") is not None:
@@ -413,11 +460,23 @@ class ResponsesTranslator:
     def _convert_tools(self, tools: list[dict] | None) -> list[dict] | None:
         if not tools:
             return None
+        import json as _j3, os as _os3
+        _dbg = _os3.path.join(_os3.path.dirname(_os3.path.dirname(__file__)), 'debug_tool_convert.log')
+        with open(_dbg, 'a', encoding='utf-8') as _f3:
+            _f3.write(f'=== _convert_tools: {len(tools)} tools ===')
+            for _t in tools:
+                if isinstance(_t, dict):
+                    _f3.write(f'  type={_t.get("type")}, name={_t.get("name")}, keys={sorted(_t.keys())}')
         result = []
+        seen_names: set[str] = set()
         for tool in tools:
             if not isinstance(tool, dict):
                 continue
             ttype = tool.get("type", "")
+            name = tool.get("name", ttype) or ttype
+            if name in seen_names:
+                continue
+            seen_names.add(name)
             if ttype == "namespace":
                 # Codex wraps tools in namespace type: {"type":"namespace","tools":[...]}
                 nested = tool.get("tools", [])
@@ -446,7 +505,7 @@ class ResponsesTranslator:
                 result.append({
                     "type": "function",
                     "function": {
-                        "name": tool.get("name", ttype),
+                        "name": name,
                         "description": tool.get("description", f"Built-in {ttype} tool"),
                         "parameters": params,
                         "strict": tool.get("strict", False),
@@ -456,7 +515,7 @@ class ResponsesTranslator:
                 result.append({
                     "type": "function",
                     "function": {
-                        "name": tool.get("name", ""),
+                        "name": name,
                         "description": tool.get("description", ""),
                         "parameters": {
                             "type": "object",
@@ -477,10 +536,16 @@ class ResponsesTranslator:
                 result.append({
                     "type": "function",
                     "function": {
-                        "name": tool.get("name", ttype),
+                        "name": name,
                         "description": tool.get("description", f"Built-in {ttype} tool"),
                         "parameters": params,
                         "strict": tool.get("strict", False),
                     }
                 })
+        import json as _j4, os as _os4
+        _dbg2 = _os4.path.join(_os4.path.dirname(_os4.path.dirname(__file__)), 'debug_tool_convert.log')
+        with open(_dbg2, 'a', encoding='utf-8') as _f4:
+            _f4.write(f'  -> converted to {len(result)} functions:')
+            for _r in result:
+                _f4.write(f'     name={_r["function"]["name"]}, params_keys={sorted(_r["function"]["parameters"].get("properties",{}).keys())}')
         return result or None

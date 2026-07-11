@@ -275,6 +275,14 @@ async def proxy_responses(request: Request):
             rlog.finish(500)
             return JSONResponse({"error": {"message": f"Streaming failed: {str(_stream_e)}"}}, status_code=500)
     else:
+        # DEBUG: log the chat_req being sent to DeepSeek
+        import json as _json2, os as _os2
+        _debug_sent = _os2.path.join(_os2.path.dirname(_os2.path.dirname(__file__)), 'debug_sent_req.json')
+        try:
+            with open(_debug_sent, 'w', encoding='utf-8') as _f2:
+                _f2.write(_json2.dumps(chat_req, ensure_ascii=False, indent=2))
+        except Exception: pass
+
         try:
             upstream_json = await post_non_streaming(
                 chat_req, config.beta_chat_completions_endpoint if use_beta else config.chat_completions_endpoint, config.deepseek_api_key
