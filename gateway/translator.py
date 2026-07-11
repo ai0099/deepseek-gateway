@@ -340,7 +340,7 @@ class ResponsesTranslator:
             flat_messages.append(assistant_msg)
         self.cache.store(response_id, flat_messages, model, chat_resp.get("usage", {}))
 
-        safe_model = model + "[1m]" if not model.endswith("[1m]") else model
+        safe_model = model
         return {
             "id": response_id,
             "object": "response",

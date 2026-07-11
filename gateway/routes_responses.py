@@ -301,7 +301,7 @@ async def get_response(response_id: str):
     cached = _translator.cache.lookup(response_id)
     if cached:
         cached_model = cached.get("model", "gpt-5.6-sol")
-        cached_model = cached_model + "[1m]" if not cached_model.endswith("[1m]") else cached_model
+        # model name returned as-is (no [1m] suffix)
         return JSONResponse({
             "id": response_id,
             "object": "response",
@@ -311,4 +311,4 @@ async def get_response(response_id: str):
             "usage": None,
         })
     return JSONResponse({"id": response_id, "object": "response", "status": "completed",
-                         "model": "gpt-5.6-sol[1m]", "output": [], "usage": None})
+                         "model": "gpt-5.6-sol", "output": [], "usage": None})
