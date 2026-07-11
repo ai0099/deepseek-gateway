@@ -51,6 +51,8 @@ class ModelMapper:
                 "object": "model",
                 "created": created_at + len(data),
                 "owned_by": "anthropic",
+                "context_window": 1050000,
+                "max_output_tokens": 393216,
             })
         # Codex model names from responses_map
         for name in self._responses_map.keys():
@@ -62,6 +64,12 @@ class ModelMapper:
                 "object": "model",
                 "created": created_at + len(data),
                 "owned_by": "openai",
+                "context_window": 1050000,
+                "max_output_tokens": 393216,
+                "supports_tools": True,
+                "supports_computer_use": True,
+                "supports_parallel_tool_calls": True,
+                "supports_streaming": True,
             })
         return {"object": "list", "data": data}
 
@@ -79,15 +87,15 @@ class ModelMapper:
     # ── Responses API (Codex) ──
 
     def resolve_responses(self, client_model: str) -> str:
-        """gpt-5.5[1m] → deepseek-v4-pro. Falls back to first slot if unknown.
-        Strips [1m] suffix from resolved model for DeepSeek Chat Completions API."""
+        """gpt-5.6-sol[1m] → deepseek-v4-pro. Falls back to first slot if unknown.
+        Strips context suffix from resolved model for DeepSeek Chat Completions API."""
         result = self._responses_map.get(client_model) or self._slot_map.get(self.slot_names[0], "deepseek-v4-pro")
         return _strip_suffix(result)
 
     def reverse_responses(self, upstream_model: str) -> str:
-        """deepseek-v4-pro → gpt-5.5[1m]. Returns matching Codex model name."""
+        """deepseek-v4-pro → gpt-5.6-sol[1m]. Returns matching Codex model name."""
         base = _strip_suffix(upstream_model)
-        return self._reverse_responses.get(base, "gpt-5.5[1m]")
+        return self._reverse_responses.get(base, "gpt-5.6-sol[1m]")
 
 
 # Singleton

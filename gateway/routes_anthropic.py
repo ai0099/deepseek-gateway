@@ -224,7 +224,7 @@ def _enforce_max_effort(body: dict):
     output_config = body.get("output_config")
     if not isinstance(output_config, dict):
         output_config = {}
-    output_config["effort"] = "xhigh"
+    output_config["effort"] = "max"
     body["output_config"] = output_config
 
 

@@ -25,7 +25,7 @@ Write-Host "  Wrote: $authFile" -ForegroundColor Gray
 $configFile = Join-Path $codexDir "config.toml"
 $tomlContent = @'
 # DeepSeek Gateway -- Codex Configuration
-model = "gpt-5.5[1m]"
+model = "gpt-5.5[922k]"
 model_provider = "deepseek-gateway"
 
 [model_providers.deepseek-gateway]

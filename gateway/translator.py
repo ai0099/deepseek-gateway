@@ -48,7 +48,17 @@ class ResponsesTranslator:
             if cached:
                 messages = cached["messages"] + messages
 
-        # input items → messages
+        # GPT-5.6 sends tools via additional_tools input items, not in top-level tools
+        _extracted_tools: list[dict] = []
+        for _item in (req.get("input") or []):
+            if isinstance(_item, dict) and _item.get("type") == "additional_tools":
+                _extracted_tools.extend(_item.get("tools") or [])
+        if _extracted_tools:
+            _existing = list(req.get("tools") or [])
+            req = dict(req)
+            req["tools"] = _existing + _extracted_tools
+
+        # input items → messages (re-read after possible req modification)
         input_data = req.get("input", [])
         if isinstance(input_data, str):
             messages.append({"role": "user", "content": input_data})
@@ -81,8 +91,9 @@ class ResponsesTranslator:
         tools = self._convert_tools(req.get("tools"))
 
         # model resolution
-        client_model = req.get("model") or "gpt-5.5"
+        client_model = req.get("model") or "gpt-5.6-sol"
         upstream_model = self._mapper.resolve_responses(client_model)
+
 
         # Post-process: move system messages that interrupt tool call sequences
         messages = self._merge_consecutive_tool_calls(messages)
@@ -99,9 +110,16 @@ class ResponsesTranslator:
             "messages": messages,
             "stream": stream_mode,
         }
-        # Always enable DeepSeek thinking mode with max effort
+        # Always enable DeepSeek thinking mode
         chat_req["thinking"] = {"type": "enabled"}
-        chat_req["reasoning_effort"] = "xhigh"
+        # Map reasoning effort: Codex "ultra" → DeepSeek "max" (DeepSeek doesn't support "ultra")
+        client_effort = (req.get("reasoning") or {}).get("effort", "max")
+        if client_effort == "ultra":
+            chat_req["reasoning_effort"] = "max"
+        elif client_effort in ("max", "high", "medium", "low", "minimal"):
+            chat_req["reasoning_effort"] = client_effort
+        else:
+            chat_req["reasoning_effort"] = "max"
         # Request usage stats in streaming mode (for cache hit tracking)
         if stream_mode:
             chat_req["stream_options"] = {"include_usage": True}
@@ -314,6 +332,10 @@ class ResponsesTranslator:
 
         item_type = item.get("type", "")
 
+        # additional_tools items are extracted in translate_request, skip them here
+        if item_type == "additional_tools":
+            return None
+
         # Reasoning items are handled by translate_request's cross-turn logic
         if item_type == "reasoning":
             return None
@@ -396,15 +418,31 @@ class ResponsesTranslator:
             if not isinstance(tool, dict):
                 continue
             ttype = tool.get("type", "")
-            if ttype in ("function", "web_search", "web_search_preview", "code_interpreter"):
+            if ttype == "namespace":
+                # Codex wraps tools in namespace type: {"type":"namespace","tools":[...]}
+                nested = tool.get("tools", [])
+                if isinstance(nested, list) and nested:
+                    nested_result = self._convert_tools(nested)
+                    if nested_result:
+                        result.extend(nested_result)
+                continue
+            if ttype == "programmatic_tool_calling":
+                # GPT-5.6 feature: hosted JS runtime to coordinate tools.
+                # DeepSeek does not support this; silently skip.
+                continue
+            if ttype in ("function", "web_search", "web_search_preview", "code_interpreter",
+                         "shell", "apply_patch", "computer_use", "image_generation",
+                         "file_search", "mcp", "skills", "tool_search"):
                 params = tool.get("parameters", {"type": "object", "properties": {}, "required": []})
                 if isinstance(params, dict):
-                    # strict mode: auto-populate required from properties keys
                     props = params.get("properties", {})
                     if isinstance(props, dict) and props:
-                        params = dict(params)  # copy to avoid mutating input
-                    params.setdefault("required", list(props.keys()))
-                    params["additionalProperties"] = False
+                        params = dict(params)
+                        params.setdefault("required", list(props.keys()))
+                    if ttype == "file_search" and not props:
+                        params = {"type": "object", "properties": {"query": {"type": "string", "description": "Search query"}}, "required": ["query"], "additionalProperties": False}
+                    else:
+                        params["additionalProperties"] = False
                 result.append({
                     "type": "function",
                     "function": {
@@ -426,6 +464,22 @@ class ResponsesTranslator:
                             "required": ["input"],
                             "additionalProperties": False,
                         },
+                        "strict": tool.get("strict", False),
+                    }
+                })
+            else:
+                params = tool.get("parameters", {"type": "object", "properties": {}, "required": []})
+                if isinstance(params, dict):
+                    if isinstance(params.get("properties"), dict) and params["properties"]:
+                        params = dict(params)
+                        params.setdefault("required", list(params["properties"].keys()))
+                    params["additionalProperties"] = False
+                result.append({
+                    "type": "function",
+                    "function": {
+                        "name": tool.get("name", ttype),
+                        "description": tool.get("description", f"Built-in {ttype} tool"),
+                        "parameters": params,
                         "strict": tool.get("strict", False),
                     }
                 })

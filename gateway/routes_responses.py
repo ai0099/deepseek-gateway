@@ -33,8 +33,45 @@ async def proxy_responses(request: Request):
     except Exception as _e:
         return JSONResponse({"error": {"message": str(_e)}}, status_code=400)
 
+    # DEBUG: log full request structure
+    try:
+        _debug_body = _os.path.join(_os.path.dirname(__file__), '..', 'debug_full_request.json')
+        import json as _j
+        # Only log first and last input items + tools info
+        summary = {
+            "model": body.get("model"),
+            "stream": body.get("stream"),
+            "keys": sorted(body.keys()),
+            "has_tools": "tools" in body,
+            "tools_count": len(body.get("tools") or []),
+            "input_count": len(body.get("input") or []),
+        }
+        # Log first 3 input items
+        inp = body.get("input") or []
+        for i, item in enumerate(inp[:3]):
+            summary[f"input[{i}]_type"] = item.get("type") if isinstance(item, dict) else str(type(item))
+            summary[f"input[{i}]_keys"] = sorted(item.keys()) if isinstance(item, dict) else "N/A"
+        # Log last input item too
+        if len(inp) > 3:
+            item = inp[-1]
+            summary[f"input[-1]_type"] = item.get("type") if isinstance(item, dict) else str(type(item))
+        # Check if any input item is an AdditionalTools/tool definition
+        tool_like_items = [i for i in inp if isinstance(i, dict) and i.get("type") in ("namespace", "additional_tool", "tool_definition")]
+        summary["tool_like_input_items"] = len(tool_like_items)
+        if tool_like_items:
+            summary["tool_like_sample"] = str(tool_like_items[0])[:500]
+        with open(_debug_body, 'a', encoding='utf-8') as _f:
+            _f.write("\n=== FULL REQUEST SUMMARY ===\n")
+            _f.write(_j.dumps(summary, ensure_ascii=False, indent=2) + "\n")
+    except Exception: pass
 
-    chat_req, response_id, use_beta = _translator.translate_request(body)
+    try:
+        chat_req, response_id, use_beta = _translator.translate_request(body)
+    except Exception as _e:
+        import traceback as _tb
+        _log = __import__("logging").getLogger("gateway")
+        _log.error("translate_request failed: %s\n%s", _e, _tb.format_exc())
+        return JSONResponse({"error": {"message": f"Translation failed: {str(_e)}"}}, status_code=500)
 
     rlog.model = chat_req.get("model", "-")
     rlog.streaming = chat_req.get("stream", False)
@@ -103,7 +140,7 @@ async def proxy_responses(request: Request):
             }, status_code=502)
 
         from .sse_transcoder import SSETranscoder
-        transcoder = SSETranscoder(body.get("model", "gpt-5.5"), response_id, body)
+        transcoder = SSETranscoder(body.get("model", "gpt-5.6-sol"), response_id, body)
 
         async def cached_stream():
             # Buffer events to handle web_search tool call interception
@@ -170,7 +207,7 @@ async def proxy_responses(request: Request):
                         config.deepseek_api_key
                     )
                     transcoder2 = SSETranscoder(
-                        body.get("model", "gpt-5.5"), response_id, body
+                        body.get("model", "gpt-5.6-sol"), response_id, body
                     )
                     async for event in transcoder2.transcode_stream(upstream_resp2):
                         yield event
@@ -195,7 +232,7 @@ async def proxy_responses(request: Request):
             if transcoder.full_tool_calls:
                 assistant_msg["tool_calls"] = transcoder.full_tool_calls
             msgs.append(assistant_msg)
-            _translator.cache.store(response_id, msgs, body.get("model", "gpt-5.5"), transcoder.usage)
+            _translator.cache.store(response_id, msgs, body.get("model", "gpt-5.6-sol"), transcoder.usage)
             # Record token usage
             if transcoder.usage is not None:
                 try:
@@ -218,15 +255,25 @@ async def proxy_responses(request: Request):
                     trim_debug_log(_debug_log, keep_requests=50)
                 except Exception: pass
 
-        return StreamingResponse(
-            cached_stream(),
-            media_type="text/event-stream",
-            headers={
-                "cache-control": "no-cache",
-                "connection": "keep-alive",
-                "x-accel-buffering": "no",
-            },
-        )
+        try:
+            return StreamingResponse(
+                cached_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "cache-control": "no-cache",
+                    "connection": "keep-alive",
+                    "x-accel-buffering": "no",
+                },
+            )
+        except Exception as _stream_e:
+            import traceback as _tb
+            _log.error("Streaming response setup failed: %s\n%s", _stream_e, _tb.format_exc())
+            try:
+                with open(_debug_log, 'a', encoding='utf-8') as _f:
+                    _f.write(f"\n[STREAMING CRASH] {_stream_e}\n{_tb.format_exc()}\n")
+            except Exception: pass
+            rlog.finish(500)
+            return JSONResponse({"error": {"message": f"Streaming failed: {str(_stream_e)}"}}, status_code=500)
     else:
         try:
             upstream_json = await post_non_streaming(
@@ -243,7 +290,7 @@ async def proxy_responses(request: Request):
             }, status_code=502)
 
         result = _translator.translate_nonstreaming_response(
-            upstream_json, body, body.get("model", "gpt-5.5"), response_id
+            upstream_json, body, body.get("model", "gpt-5.6-sol"), response_id
         )
         rlog.finish(200, _translator.last_usage if hasattr(_translator, 'last_usage') else None)
         # Debug: log cache performance for non-streaming
@@ -269,7 +316,7 @@ async def proxy_responses(request: Request):
 async def get_response(response_id: str):
     cached = _translator.cache.lookup(response_id)
     if cached:
-        cached_model = cached.get("model", "gpt-5.5")
+        cached_model = cached.get("model", "gpt-5.6-sol")
         cached_model = cached_model + "[1m]" if not cached_model.endswith("[1m]") else cached_model
         return JSONResponse({
             "id": response_id,
@@ -280,4 +327,4 @@ async def get_response(response_id: str):
             "usage": None,
         })
     return JSONResponse({"id": response_id, "object": "response", "status": "completed",
-                         "model": "gpt-5.5[1m]", "output": [], "usage": None})
+                         "model": "gpt-5.6-sol[1m]", "output": [], "usage": None})
