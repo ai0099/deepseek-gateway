@@ -45,7 +45,7 @@ class ModelMapper:
             if base in seen:
                 continue
             seen.add(base)
-            display_name = base + "[1m]"
+            display_name = base
             data.append({
                 "id": display_name,
                 "object": "model",
@@ -79,10 +79,9 @@ class ModelMapper:
         return self._slot_map.get(base, self._slot_map.get(self.slot_names[0], "deepseek-v4-pro"))
 
     def reverse_anthropic(self, upstream_model: str) -> str:
-        """deepseek-v4-pro → claude-fable-5[1m]. Always appends [1m] suffix."""
+        """deepseek-v4-pro → claude-fable-5."""
         base = self._reverse.get(_strip_suffix(upstream_model), self.slot_names[0])
-        base = _strip_suffix(base)
-        return base + "[1m]"
+        return _strip_suffix(base)
 
     # ── Responses API (Codex) ──
 

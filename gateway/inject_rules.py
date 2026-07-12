@@ -77,17 +77,17 @@ _CLAUDE_ROOT = _Path(_os.environ["USERPROFILE"]) / ".claude"
 _INJECTION_FILE_PATHS: list[_Path] = [
     _CLAUDE_ROOT / "CLAUDE.md",
     _CLAUDE_ROOT / "skills" / "thinking" / "SKILL.md",
-    _CLAUDE_ROOT / "rules" / "C01-progressive-problem-solving.md",
-    _CLAUDE_ROOT / "rules" / "C02-mandatory-security-audit.md",
-    _CLAUDE_ROOT / "rules" / "C03-dont-be-stupid.md",
-    _CLAUDE_ROOT / "rules" / "C04-purpose-driven-closed-loop.md",
-    _CLAUDE_ROOT / "rules" / "C05-parallel-first-intelligent-task-assignment.md",
-    _CLAUDE_ROOT / "rules" / "Fable5-capability-enhancement.md",
-    _CLAUDE_ROOT / "rules" / "R01-environment-and-tool-infrastructure.md",
-    _CLAUDE_ROOT / "rules" / "R02-tool-first-never-trust-your-gut.md",
-    _CLAUDE_ROOT / "rules" / "R03-copy-first.md",
-    _CLAUDE_ROOT / "rules" / "R04-disabled-native-tools.md",
-    _CLAUDE_ROOT / "rules" / "R05-agent-usage-standards.md",
+    _CLAUDE_ROOT / "rules" / "C01_Progressive_Problem_Solving.md",
+    _CLAUDE_ROOT / "rules" / "C02_Mandatory_Security_Audit_Pre_Check.md",
+    _CLAUDE_ROOT / "rules" / "C03_Dont_Be_Stupid.md",
+    _CLAUDE_ROOT / "rules" / "C04_Purpose_Driven_Closed_Loop.md",
+    _CLAUDE_ROOT / "rules" / "C05_Parallel_First_Intelligent_Task_Assignment.md",
+    _CLAUDE_ROOT / "rules" / "Fable5_Capability_Enhancement.md",
+    _CLAUDE_ROOT / "rules" / "R01_Environment_Tool_Infrastructure.md",
+    _CLAUDE_ROOT / "rules" / "R02_Tool_First_Never_Trust_Your_Gut.md",
+    _CLAUDE_ROOT / "rules" / "R03_Copy_First.md",
+    _CLAUDE_ROOT / "rules" / "R04_Disabled_Native_Tools.md",
+    _CLAUDE_ROOT / "rules" / "R05_Agent_Usage_Standards.md",
 ]
 
 _EXPECTED_FILE_NAMES = [p.name for p in _INJECTION_FILE_PATHS]
