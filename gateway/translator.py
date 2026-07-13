@@ -53,7 +53,7 @@ def _normalize_message(msg: dict) -> dict:
             result = {}
             for k in sorted(value.keys()):
                 v = _canonical(value[k])
-                if v is not None:
+                if v is not None or k == "content":
                     result[k] = v
             # Normalize content part types: input_text/output_text → text
             if "type" in result and result["type"] in ("input_text", "output_text"):
@@ -67,6 +67,9 @@ def _normalize_message(msg: dict) -> dict:
     normalized = _canonical(msg)
     if normalized is None:
         return {}
+    # DeepSeek requires tool messages to have non-null content
+    if normalized.get("role") == "tool" and normalized.get("content") is None:
+        normalized["content"] = ""
     return normalized
 
 
@@ -195,13 +198,24 @@ class ResponsesTranslator:
                             s.get("text", "") for s in (item.get("summary") or [])
                         )
                     continue
-                # IMPORTANT: Pending reasoning must NOT be injected into ANY message.
-                # Codex may or may not include reasoning items between turns.
-                # Injecting reasoning_content changes the JSON of messages that
-                # were cached in previous rounds → DeepSeek prefix cache MISS.
-                # We silently consume reasoning to keep the token sequence stable.
+                # Attach reasoning to NEW assistant messages (freshly created from
+                # function_call items) via reasoning_content. DeepSeek thinking mode
+                # REQUIRES reasoning_content to be passed back. This is cache-safe
+                # because these messages don't exist in any previous round's cache.
+                # For PAST assistants (when next msg is user/tool), insert reasoning
+                # as a separate system message — additive, not mutative.
                 if pending_reasoning:
-                    pending_reasoning = ""
+                    if msg.get("role") == "assistant":
+                        msg["reasoning_content"] = pending_reasoning
+                        pending_reasoning = ""
+                    elif msg.get("role") in ("user", "tool"):
+                        insert_pos = len(messages)
+                        for idx in range(len(messages) - 1, -1, -1):
+                            if messages[idx].get("role") == "assistant":
+                                insert_pos = idx + 1
+                                break
+                        messages.insert(insert_pos, {"role": "system", "content": "[Reasoning]\n" + pending_reasoning})
+                        pending_reasoning = ""
                 messages.append(msg)
 
         # tools → Chat Completions tools (filter function type only)
