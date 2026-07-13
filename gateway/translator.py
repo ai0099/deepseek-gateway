@@ -276,9 +276,12 @@ class ResponsesTranslator:
         chat_req = {
             "model": upstream_model,
             "system": system_content,
-            "messages": clean_messages,
-            "stream": stream_mode,
         }
+        # Tools go BEFORE messages so they are part of the cache prefix (static across rounds).
+        if tools:
+            chat_req["tools"] = tools
+        chat_req["messages"] = clean_messages
+        chat_req["stream"] = stream_mode
         # Always enable DeepSeek thinking mode
         chat_req["thinking"] = {"type": "enabled"}
         # Map reasoning effort: Codex "ultra" → DeepSeek "max" (DeepSeek doesn't support "ultra")
@@ -293,8 +296,6 @@ class ResponsesTranslator:
         if stream_mode:
             chat_req["stream_options"] = {"include_usage": True}
         chat_req["tool_choice"] = req.get("tool_choice", "auto")
-        if tools:
-            chat_req["tools"] = tools
         if req.get("response_format"):
             chat_req["response_format"] = req["response_format"]
         if req.get("temperature") is not None:
