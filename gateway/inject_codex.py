@@ -109,6 +109,8 @@ _EXPECTED_FILE_NAMES = [p.name for p in _INJECTION_FILE_PATHS]
 # ═══════════════════════════════════════════════════════════════════════════
 
 _INJECTION_STRING: str = ""
+_ANCHOR_STRING: str = ""          # 26 anchors only — for top-level system
+_FILES_STRING: str = ""           # CLAUDE.md + SKILL.md + rules — for messages[0]
 _LOADED_COUNT: int = 0
 
 
@@ -121,25 +123,27 @@ def _read(path: _Path) -> str:
 
 
 def _build_injection_string() -> str:
-    """组装 Codex 注入字符串：锚点 + 所有文件。"""
-    global _INJECTION_STRING, _LOADED_COUNT
+    """Build injection strings: anchors-only for system field, files for messages[0]."""
+    global _INJECTION_STRING, _ANCHOR_STRING, _FILES_STRING, _LOADED_COUNT
 
-    parts = [_ANCHOR_BLOCK]
+    _ANCHOR_STRING = _ANCHOR_BLOCK
 
     loaded = 0
+    file_parts = []
     for p in _INJECTION_FILE_PATHS:
         content = _read(p)
         if content:
-            parts.append(content)
+            file_parts.append(content)
             loaded += 1
 
     _LOADED_COUNT = loaded
-    _INJECTION_STRING = _SEPARATOR.join(parts)
+    _FILES_STRING = _SEPARATOR.join(file_parts) if file_parts else ""
+    _INJECTION_STRING = _ANCHOR_STRING  # keep backwards compat for verify
 
-    total_chars = len(_INJECTION_STRING)
+    total_chars = len(_ANCHOR_STRING) + len(_FILES_STRING)
     expected = len(_INJECTION_FILE_PATHS)
     status = "OK" if _verify_anchors_integrity() else "SHA256 MISMATCH!"
-    print(f"  [inject_codex] Loaded {loaded}/{expected} files -> injection block: {total_chars:,} chars | anchors: {status}")
+    print(f"  [inject_codex] Loaded {loaded}/{expected} files -> anchors: {len(_ANCHOR_STRING):,} chars, files: {len(_FILES_STRING):,} chars | anchors: {status}")
     return _INJECTION_STRING
 
 
@@ -187,30 +191,31 @@ _WARNING_TEXT = (
 )
 
 
-def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, list[dict]]:
-    """Codex Chat Completions 前缀注入 — top-level system 版本。
+def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, str, list[dict]]:
+    """Codex Chat Completions 前缀注入 — split anchors (system) / files (messages[0]).
 
-    注入顺序：Codex 锚点 + 所有规则文件 + (可选) extra_content。
-    返回 (system_content, messages) 元组，其中 system_content 作为顶层 "system" 字段发给 DeepSeek，
-    messages 不包含 system 消息——从对话历史的第一条开始。
-    这样 system 字段跨轮永不改变，DeepSeek 可将其作为独立缓存前缀，
-    与 Anthropic 端点行为一致。
+    注入顺序：
+      - system field: 26 条 Codex 锚点 only
+      - messages[0]: CLAUDE.md + SKILL.md + all rules (Codex can read this layer)
 
     Args:
-        messages: 已有的消息列表（不含 system）
+        messages: 已有的消息列表
         extra_content: 额外的指令内容（如 app_instructions）
 
     Returns:
-        (system_content, messages) — system_content 是顶层字段，messages 不包含 system
+        (system_content, files_content, messages) — system 只含锚点，files 作为 messages[0]
     """
-    content = _INJECTION_STRING
-    if extra_content:
-        content = _INJECTION_STRING + "\n\n" + extra_content
+    system_content = _ANCHOR_STRING
 
-    # 验证注入顺序：用临时消息列表检查
-    temp = [{"role": "system", "content": content}] + messages
-    ok, details = verify_injection_order(temp)
+    # Verify anchors integrity
+    ok, details = verify_injection_order(
+        [{"role": "system", "content": _ANCHOR_STRING}] + messages
+    )
     if not ok:
-        content = content + _WARNING_TEXT
+        system_content = _ANCHOR_STRING + _WARNING_TEXT
 
-    return content, messages
+    files_content = _FILES_STRING
+    if extra_content:
+        files_content = _FILES_STRING + "\n\n" + extra_content if _FILES_STRING else extra_content
+
+    return system_content, files_content, messages

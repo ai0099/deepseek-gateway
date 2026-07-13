@@ -232,11 +232,12 @@ class ResponsesTranslator:
         messages = self._reorder_tool_responses(messages)
         messages = self._fix_tool_call_continuity(messages)
 
-        # Inject stable cache prefix + app instructions as top-level "system" field.
-        # This places the prefix OUTSIDE the messages array so DeepSeek can cache
-        # it independently (matching Anthropic endpoint behavior where "system" is
-        # a top-level field that never changes across rounds).
-        system_content, messages = inject_prefix_chat(messages, app_instructions)
+        # Inject stable cache prefix as top-level "system" field (anchors only).
+        # Rule files (CLAUDE.md + SKILL.md + rules) go as messages[0] so Codex
+        # can see them — Codex reads messages[] but not the top-level system field.
+        system_content, files_content, messages = inject_prefix_chat(messages, app_instructions)
+        if files_content:
+            messages = [{"role": "system", "content": files_content}] + messages
 
         # Normalize all messages to canonical JSON form so the same
         # semantic message produces the same token sequence across rounds.
