@@ -170,7 +170,7 @@ class ResponsesTranslator:
         _SYSTEM_TOOLS = [
             {"type": "function", "name": "shell_command", "description": "Run a PowerShell command on Windows", "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "PowerShell command to execute"}}, "required": ["command"], "additionalProperties": False}},
             {"type": "function", "name": "apply_patch", "description": "Apply a patch to edit files using FREEFORM syntax", "parameters": {"type": "object", "properties": {"input": {"type": "string", "description": "Patch content in *** Begin Patch / *** End Patch format"}}, "required": ["input"], "additionalProperties": False}},
-            {"type": "function", "name": "view_image", "description": "View a local image file", "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "Path to image file"}}, "required": ["path"], "additionalProperties": False}},
+            # view_image removed — DeepSeek V4 does not support image tools
             {"type": "function", "name": "get_goal", "description": "Get current goal status", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
             {"type": "function", "name": "create_goal", "description": "Create a new goal", "parameters": {"type": "object", "properties": {"objective": {"type": "string", "description": "Goal objective"}}, "required": ["objective"], "additionalProperties": False}},
             {"type": "function", "name": "update_goal", "description": "Update goal status", "parameters": {"type": "object", "properties": {"status": {"type": "string", "enum": ["complete", "blocked"]}}, "required": ["status"], "additionalProperties": False}},
@@ -226,9 +226,10 @@ class ResponsesTranslator:
         upstream_model = self._mapper.resolve_responses(client_model)
 
 
-        # Post-process: merge consecutive assistant(tool_calls) and
-        # move system messages that interrupt tool call sequences.
+        # Post-process: merge consecutive assistant(tool_calls), reorder
+        # parallel tool responses, and fix interrupted tool call sequences.
         messages = self._merge_consecutive_tool_calls(messages)
+        messages = self._reorder_tool_responses(messages)
         messages = self._fix_tool_call_continuity(messages)
 
         # Inject stable cache prefix + app instructions as top-level "system" field.
@@ -319,14 +320,11 @@ class ResponsesTranslator:
         if req.get("top_p") is not None:
             chat_req["top_p"] = req["top_p"]
 
-        # Sanitize: strip any input_image content from ALL messages
+        # Sanitize: drop any input_image parts from ALL messages
         # (DeepSeek V4 Chat Completions only accepts text type)
         for msg in messages:
             if isinstance(msg.get("content"), list):
-                msg["content"] = [
-                    {"type": "text", "text": "[image]"} if c.get("type") == "input_image" else c
-                    for c in msg["content"]
-                ]
+                msg["content"] = [c for c in msg["content"] if c.get("type") != "input_image"]
 
         # Determine if we need beta endpoint for strict-mode tools
         use_beta = any(t.get("strict") for t in (tools or []))
@@ -404,6 +402,45 @@ class ResponsesTranslator:
                     break
             for ds in deferred_system:
                 result.insert(insert_pos, ds)
+
+        return result
+
+    def _reorder_tool_responses(self, messages: list[dict]) -> list[dict]:
+        """Collect and reorder tool responses so each assistant(tool_calls) is
+        immediately followed by ALL its matching tool messages, before any
+        subsequent assistant(tool_calls) in the list."""
+        if not messages:
+            return messages
+
+        # Step 1: remove all tool messages from the list, storing them by ID
+        tool_map: dict[str, dict] = {}
+        non_tool: list[dict] = []
+        for m in messages:
+            if m.get("role") == "tool":
+                tid = m.get("tool_call_id", "")
+                if tid:
+                    tool_map[tid] = m
+                else:
+                    non_tool.append(m)  # tool msg with no ID — keep it
+            else:
+                non_tool.append(m)
+
+        if not tool_map:
+            return messages
+
+        # Step 2: for each assistant(tc) in non_tool, insert its tool messages
+        # right after it (in the order the call IDs appear in tool_calls)
+        result: list[dict] = []
+        for m in non_tool:
+            result.append(m)
+            if m.get("role") == "assistant" and m.get("tool_calls"):
+                for tc in m["tool_calls"]:
+                    tid = tc.get("id", "")
+                    if tid in tool_map:
+                        result.append(tool_map.pop(tid))
+
+        # Step 3: any remaining tool messages (orphaned — no matching assistant)
+        # get dropped. There's nothing DeepSeek can do with them anyway.
 
         return result
 
@@ -560,7 +597,13 @@ class ResponsesTranslator:
         content = item.get("content", [])
         parts: list[dict] = []
         if isinstance(content, str):
-            return {"role": role, "content": content}
+            # Preserve tool message metadata if present
+            msg = {"role": role, "content": content}
+            if role == "tool":
+                tid = item.get("tool_call_id") or item.get("call_id")
+                if tid:
+                    msg["tool_call_id"] = tid
+            return msg
 
         tool_calls: list[dict] = []
         for part in (content if isinstance(content, list) else [content]):
@@ -570,8 +613,8 @@ class ResponsesTranslator:
             if ptype in ("input_text", "output_text"):
                 parts.append({"type": "text", "text": part.get("text", "")})
             elif ptype == "input_image":
-                # DeepSeek V4 does not support image_url; replace with placeholder text
-                parts.append({"type": "text", "text": "[image]"})
+                # DeepSeek V4 does not support images; drop silently
+                continue
             elif ptype == "refusal":
                 parts.append({"type": "text", "text": f"[refusal] {part.get('refusal', '')}"})
             elif ptype == "function_call":
@@ -587,7 +630,13 @@ class ResponsesTranslator:
                 parts.append(part)
 
         if not parts and not tool_calls:
-            return None
+            # Check for top-level tool_calls (Chat Completions format from
+            # recovered conversation history or raw assistant items)
+            top_tc = item.get("tool_calls")
+            if isinstance(top_tc, list) and top_tc:
+                tool_calls = top_tc
+            else:
+                return None
 
         msg = {"role": role}
         if tool_calls:
