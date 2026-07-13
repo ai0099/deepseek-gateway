@@ -252,8 +252,8 @@ class ResponsesTranslator:
                 if isinstance(content, list):
                     text_parts = []
                     for part in content:
-                        if isinstance(part, dict) and part.get("type") == "text":
-                            text_parts.append(str(part.get("text", "")))
+                        if isinstance(part, dict) and "text" in part:
+                            text_parts.append(str(part["text"]))
                     content = "\n".join(text_parts)
                 content_str = str(content)
                 if content_str:
@@ -613,6 +613,9 @@ class ResponsesTranslator:
                 })
             elif ptype == "text":
                 parts.append(part)
+            elif "text" in part:
+                # Dict with "text" key but no "type" key — treat as text
+                parts.append({"type": "text", "text": part.get("text", "")})
 
         if not parts and not tool_calls:
             # Check for top-level tool_calls (Chat Completions format from
