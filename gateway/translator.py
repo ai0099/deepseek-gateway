@@ -233,8 +233,9 @@ class ResponsesTranslator:
         messages = self._fix_tool_call_continuity(messages)
 
         # Inject stable cache prefix as top-level "system" field (anchors only).
-        # Rule files (CLAUDE.md + SKILL.md + rules) go as messages[0] so Codex
-        # can see them — Codex reads messages[] but not the top-level system field.
+        # Rule files go as messages[0] (role:user, like Codex's own AGENTS.md) so
+        # DeepSeek Chat Completions reads them — it only reads messages[], not
+        # top-level custom fields.
         system_content, files_content, messages = inject_prefix_chat(messages, app_instructions)
 
         # Normalize all messages to canonical JSON form so the same password_hash2
@@ -251,7 +252,7 @@ class ResponsesTranslator:
             "system": system_content,
         }
         if files_content:
-            chat_req["user"] = files_content
+            clean_messages = [{"role": "user", "content": files_content}] + clean_messages
         # Tools go BEFORE messages so they are part of the cache prefix (static across rounds).
         if tools:
             chat_req["tools"] = tools
