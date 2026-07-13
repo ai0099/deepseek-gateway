@@ -238,32 +238,6 @@ class ResponsesTranslator:
         # a top-level field that never changes across rounds).
         system_content, messages = inject_prefix_chat(messages, app_instructions)
 
-        # Extract ALL system messages from messages[] into the top-level "system"
-        # field. Codex intersperses ~97 system messages throughout the conversation
-        # (agent identity, C03/Tool checks, turn_aborted, model_switch, PS lists,
-        # permissions, etc.). Moving them ALL to system makes messages[] a pure
-        # append-only conversation stream, enabling DeepSeek exact-prefix cache
-        # across rounds. No keep-in-place exceptions — all system msgs go to system.
-        extra_system_parts = []
-        clean_messages_temp = []
-        for m in messages:
-            if m.get("role") == "system":
-                content = m.get("content", "")
-                if isinstance(content, list):
-                    text_parts = []
-                    for part in content:
-                        if isinstance(part, dict) and "text" in part:
-                            text_parts.append(str(part["text"]))
-                    content = "\n".join(text_parts)
-                content_str = str(content)
-                if content_str:
-                    extra_system_parts.append(content_str)
-            else:
-                clean_messages_temp.append(m)
-        if extra_system_parts:
-            system_content = system_content + "\n\n---\n\n" + "\n\n---\n\n".join(extra_system_parts)
-        messages = clean_messages_temp
-
         # Normalize all messages to canonical JSON form so the same
         # semantic message produces the same token sequence across rounds.
         messages = _normalize_messages(messages)
