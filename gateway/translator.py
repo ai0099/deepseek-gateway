@@ -223,26 +223,41 @@ class ResponsesTranslator:
         # a top-level field that never changes across rounds).
         system_content, messages = inject_prefix_chat(messages, app_instructions)
 
-        # Merge ALL system messages from messages[] into the top-level "system" field.
-        # Codex intersperses system messages throughout the conversation (Codex agent
-        # identity, C03 checks, tool checks, turn_aborted markers, model switches, etc.).
-        # Their content changes between rounds → DeepSeek cache breaks at the first
-        # system message that differs. By moving them ALL into the top-level "system"
-        # field (which is static-after-injection), DeepSeek can cache the full prefix.
+        # Merge NON-POSITION-SENSITIVE system messages into the top-level "system"
+        # field. Codex intersperses three categories of system messages:
+        #
+        #   STATIC (3):  Agent identity, role, multi_agent_mode — merge ✓
+        #   DYNAMIC (83): C03/Tool checks, PS process lists — merge ✓
+        #   CONTEXT (11): turn_aborted, model_switch, collaboration_mode — KEEP IN PLACE
+        #
+        # CONTEXT messages mark specific points in the conversation timeline and
+        # must stay where they are for the model to understand interruptions,
+        # model switches, and collaboration mode changes. Their content is static
+        # across rounds (same turn_aborted text every time), so keeping them in
+        # messages[] does NOT break cache — only new ones append at the end.
+        _KEEP_IN_PLACE_KEYWORDS = (
+            "turn_aborted",
+            "model_switch",
+            "collaboration_mode",
+            "Collaboration Mode",
+        )
         non_system_msgs = []
         extra_system_parts = []
         for m in messages:
             if m.get("role") == "system":
                 content = m.get("content", "")
                 if isinstance(content, list):
-                    # Flatten content arrays: pick text from each part
                     text_parts = []
                     for part in content:
                         if isinstance(part, dict) and part.get("type") == "text":
                             text_parts.append(str(part.get("text", "")))
                     content = "\n".join(text_parts)
-                if content:
-                    extra_system_parts.append(str(content))
+                content_str = str(content)
+                # Position-sensitive messages stay in place
+                if any(kw in content_str for kw in _KEEP_IN_PLACE_KEYWORDS):
+                    non_system_msgs.append(m)
+                elif content_str:
+                    extra_system_parts.append(content_str)
             else:
                 non_system_msgs.append(m)
         if extra_system_parts:
