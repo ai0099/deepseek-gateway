@@ -138,7 +138,7 @@ def _build_injection_string() -> str:
 
     _LOADED_COUNT = loaded
     _raw = _SEPARATOR.join(file_parts) if file_parts else ""
-    _FILES_STRING = f"<GATEWAY_RULES>\n{_raw}\n</GATEWAY_RULES>" if _raw else ""
+    _FILES_STRING = f"<AGENT_RULES>\n{_raw}\n</AGENT_RULES>" if _raw else ""
     _INJECTION_STRING = _ANCHOR_STRING  # keep backwards compat for verify
 
     total_chars = len(_ANCHOR_STRING) + len(_FILES_STRING)
