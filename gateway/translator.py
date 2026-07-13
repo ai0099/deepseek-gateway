@@ -237,7 +237,7 @@ class ResponsesTranslator:
         # can see them — Codex reads messages[] but not the top-level system field.
         system_content, files_content, messages = inject_prefix_chat(messages, app_instructions)
         if files_content:
-            messages = [{"role": "system", "content": files_content}] + messages
+            messages = [{"role": "user", "content": files_content}] + messages
 
         # Normalize all messages to canonical JSON form so the same
         # semantic message produces the same token sequence across rounds.
