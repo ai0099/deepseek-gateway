@@ -23,11 +23,16 @@ class ModelMapper:
             if base not in seen:
                 self._reverse[base] = claude_name
                 seen.add(base)
-        # Reverse: deepseek name → first Codex model name
+        # Reverse-only entries: upstream models that map to existing slots
+        # (no forward slot — they share a client-facing name on return only)
+        self._reverse["deepseek-v4-flash"] = "claude-fable-5[1m]"
+        # Reverse: deepseek name → first Codex model name (prefer [1m] versions)
         self._reverse_responses: dict[str, str] = {}
         for codex_name, ds_name in self._responses_map.items():
             if ds_name not in self._reverse_responses:
                 self._reverse_responses[ds_name] = codex_name
+            elif "[1m]" in codex_name:
+                self._reverse_responses[ds_name] = codex_name  # prefer [1m]
 
     # ── Anthropic (Claude Desktop / Claude Code) ──
 
@@ -45,7 +50,7 @@ class ModelMapper:
             if base in seen:
                 continue
             seen.add(base)
-            display_name = base
+            display_name = name
             data.append({
                 "id": display_name,
                 "object": "model",
@@ -54,11 +59,16 @@ class ModelMapper:
                 "context_window": 1050000,
                 "max_output_tokens": 393216,
             })
-        # Codex model names from responses_map
+        # Codex model names from responses_map (prefer [1m] versions)
+        models_by_base: dict[str, str] = {}
         for name in self._responses_map.keys():
-            if name in seen:
+            base = _strip_suffix(name)
+            if base not in models_by_base or "[1m]" in name:
+                models_by_base[base] = name
+        for base, name in models_by_base.items():
+            if base in seen:
                 continue
-            seen.add(name)
+            seen.add(base)
             data.append({
                 "id": name,
                 "object": "model",
@@ -74,27 +84,43 @@ class ModelMapper:
         return {"object": "list", "data": data}
 
     def resolve_anthropic(self, client_model: str) -> str:
-        """claude-sonnet-4-20250514[1m] → deepseek-v4-pro[1m] (strips [1m] suffix first)."""
+        """claude-fable-5[1m] → deepseek-v4-pro[1m]. Exact match first, then stripped base."""
+        # Exact match (primary: client sends "claude-fable-5[1m]")
+        if client_model in self._slot_map:
+            return self._slot_map[client_model]
+        # Stripped base match (backward compat: client sends bare "claude-fable-5")
         base = _strip_suffix(client_model)
-        return self._slot_map.get(base, self._slot_map.get(self.slot_names[0], "deepseek-v4-pro"))
+        for key, value in self._slot_map.items():
+            if _strip_suffix(key) == base:
+                return value
+        # Fallback to first slot
+        return self._slot_map.get(self.slot_names[0], "deepseek-v4-pro")
 
     def reverse_anthropic(self, upstream_model: str) -> str:
-        """deepseek-v4-pro → claude-fable-5."""
+        """deepseek-v4-pro → claude-fable-5[1m]."""
         base = self._reverse.get(_strip_suffix(upstream_model), self.slot_names[0])
-        return _strip_suffix(base)
+        return base
 
     # ── Responses API (Codex) ──
 
     def resolve_responses(self, client_model: str) -> str:
-        """gpt-5.6-sol → deepseek-v4-pro. Falls back to first slot if unknown.
+        """gpt-5.6-sol[1m] → deepseek-v4-pro. Falls back to first slot if unknown.
         Strips context suffix from resolved model for DeepSeek Chat Completions API."""
         result = self._responses_map.get(client_model) or self._slot_map.get(self.slot_names[0], "deepseek-v4-pro")
         return _strip_suffix(result)
 
     def reverse_responses(self, upstream_model: str) -> str:
-        """deepseek-v4-pro → gpt-5.6-sol. Returns matching Codex model name."""
+        """deepseek-v4-pro → gpt-5.6-sol[1m]. Returns matching Codex model name."""
+        # Exact match (primary: upstream returns "deepseek-v4-pro[1m]")
+        if upstream_model in self._reverse_responses:
+            return self._reverse_responses[upstream_model]
+        # Stripped base match (backward compat: upstream returns bare "deepseek-v4-pro")
         base = _strip_suffix(upstream_model)
-        return self._reverse_responses.get(base, "gpt-5.6-sol")
+        for key, value in self._reverse_responses.items():
+            if _strip_suffix(key) == base:
+                return value
+        # Fallback
+        return "gpt-5.6-sol[1m]"
 
 
 # Singleton

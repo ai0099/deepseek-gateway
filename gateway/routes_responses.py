@@ -50,6 +50,19 @@ async def _proxy_responses_impl(request: Request):
     except Exception as _e:
         return JSONResponse({"error": {"message": str(_e)}}, status_code=400)
 
+    # ── DIAG: log request size for dual-stream cache miss debugging ──
+    _diag_input = body.get("input")
+    _diag_input_count = len(_diag_input) if isinstance(_diag_input, list) else 0
+    _diag_prev_id = body.get("previous_response_id", "")
+    _diag_instructions_len = len(body.get("instructions", "") or "")
+    import logging as _diag_logging
+    _diag_logging.getLogger("gateway").info(
+        "REQ_DIAG input=%d prev_id=%s instr_len=%d",
+        _diag_input_count,
+        "set" if _diag_prev_id else "none",
+        _diag_instructions_len,
+    )
+
     try:
         chat_req, response_id, use_beta = _translator.translate_request(body)
     except Exception as _e:
@@ -65,18 +78,14 @@ async def _proxy_responses_impl(request: Request):
     client_model = body.get("model", "?")
     upstream_model = chat_req.get("model", "?")
     msgs = chat_req.get("messages", [])
-    # Find first system message content for injection verification
-    sys_content = ""
-    for m in msgs:
-        if m.get("role") == "system":
-            sys_content = str(m.get("content", ""))
-            break
+    # Extract system from top-level field (not messages[0])
+    sys_content = str(chat_req.get("system", ""))
     system_chars = len(sys_content)
     msg_chars = len(str(msgs))
     total_est = int(system_chars * 0.35 + msg_chars * 0.3)
 
-    # Verify injection order (check anchor hash in first system message)
-    from .inject_rules import _ANCHOR_SHA256 as _ANCHOR_SHA, _ANCHOR_LENGTH
+    # Verify injection order (check Codex anchor hash in first system message)
+    from .inject_codex import _ANCHOR_SHA256 as _ANCHOR_SHA, _ANCHOR_LENGTH
     import hashlib as _hashlib
     anchor_ok = False
     if len(sys_content) >= _ANCHOR_LENGTH:
@@ -85,20 +94,61 @@ async def _proxy_responses_impl(request: Request):
     inject_status = "OK" if anchor_ok else "MISMATCH"
     if not anchor_ok:
         _log = logging.getLogger("gateway")
-        _log.error("INJECTION MISMATCH on /v1/responses: anchor SHA256 differs! Expected %s..., got %s...",
+        _log.error("INJECTION MISMATCH on /v1/responses (Codex route): anchor SHA256 differs! Expected %s..., got %s...",
                    _ANCHOR_SHA[:16], actual_sha[:16] if len(sys_content) >= _ANCHOR_LENGTH else "N/A")
 
-    # Debug: log chat request info + token estimate
+    # Debug: log chat request info + token estimate + FULL CACHE DIFF TRACKING
     _debug_log = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'debug_requests.log')
     rotate_log_file(_debug_log)
     try:
         system_preview = sys_content[:300].replace("\n", "\\n")
+        _sys_hash = _hashlib.sha256(sys_content.encode()).hexdigest()[:12]
+
+        # Hash ALL non-system messages with positional checkpoints
+        # AND log raw JSON of key messages for cross-round comparison
+        _cache_msgs = msgs  # no system msg in messages — system is top-level field
+        _all_hashes = []
+        _debug_snapshots = []  # raw JSON of important messages
+        for _idx, _m in enumerate(_cache_msgs):
+            _m_str = json.dumps(_m, ensure_ascii=False, sort_keys=True)
+            _all_hashes.append(_hashlib.sha256(_m_str.encode()).hexdigest()[:8])
+            # Snapshot messages at key positions for cross-round comparison
+            if _idx in (0, 1, 2, 9, 49, 99, 199, 299, 399):
+                _debug_snapshots.append(f"  msg[{_idx}]={_m_str[:120]}")
+
+        # Fingerprint at key checkpoints (first 10, then every 50th)
+        _fp_parts = []
+        for _idx in [0, 1, 2, 9, 49, 99, 199, 299, 399]:
+            if _idx < len(_all_hashes):
+                _fp_parts.append(f"{_idx}:{_all_hashes[_idx]}")
+        _prefix_fp = " ".join(_fp_parts)
+
+        # Also hash chat_req params that affect cache (tool ordering, etc.)
+        _tools_hash = _hashlib.sha256(json.dumps(chat_req.get("tools", []), ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:8]
+        _params_fp = f"tools={_tools_hash} effort={chat_req.get('reasoning_effort','?')} tool_choice={chat_req.get('tool_choice','?')}"
+
         with open(_debug_log, 'a', encoding='utf-8') as _f:
             _f.write(f"\n[RESPONSES] model={client_model} -> {upstream_model} stream={chat_req.get('stream')} msgs={len(msgs)}\n")
             _f.write(f"  UA: {(request.headers.get('user-agent') or 'none')[:200]}\n")
-            _f.write(f"  system_preview={system_preview}\n")
-            _f.write(f"  system_chars={system_chars:,} msg_chars={msg_chars:,} est_total_tokens={total_est:,}\n")
+            _f.write(f"  system_chars={system_chars:,} sys_hash={_sys_hash}\n")
+            _f.write(f"  msg_chars={msg_chars:,} est_total_tokens={total_est:,}\n")
             _f.write(f"  inject_order={inject_status}\n")
+            _f.write(f"  request_params={_params_fp}\n")
+            _f.write(f"  cache_fp={_prefix_fp}\n")
+            for _s in _debug_snapshots[:10]:
+                _f.write(_s + "\n")
+            _f.write(f"  total_non_system_msgs={len(_cache_msgs)}\n")
+
+        # Write the FULL body sent to DeepSeek for cross-round diff analysis
+        _body_dir = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'sent_bodies')
+        _os.makedirs(_body_dir, exist_ok=True)
+        import time as _time2
+        _body_file = _os.path.join(_body_dir, f"req_{_time2.strftime('%H%M%S')}_{len(msgs)}msgs.json")
+        with open(_body_file, 'w', encoding='utf-8') as _bf:
+            json.dump(chat_req, _bf, ensure_ascii=False)
+        # Also log the file path for tracking
+        with open(_debug_log, 'a', encoding='utf-8') as _f:
+            _f.write(f"  body_file={_body_file}\n")
     except Exception: pass
 
     _log = logging.getLogger("gateway")
@@ -124,7 +174,7 @@ async def _proxy_responses_impl(request: Request):
             }, status_code=502)
 
         from .sse_transcoder import SSETranscoder
-        transcoder = SSETranscoder(body.get("model", "gpt-5.6-sol"), response_id, body)
+        transcoder = SSETranscoder(body.get("model", "gpt-5.6-sol[1m]"), response_id, body)
 
         async def cached_stream():
             # Buffer events to handle web_search tool call interception
@@ -191,7 +241,7 @@ async def _proxy_responses_impl(request: Request):
                         config.deepseek_api_key
                     )
                     transcoder2 = SSETranscoder(
-                        body.get("model", "gpt-5.6-sol"), response_id, body
+                        body.get("model", "gpt-5.6-sol[1m]"), response_id, body
                     )
                     async for event in transcoder2.transcode_stream(upstream_resp2):
                         yield event
@@ -216,7 +266,7 @@ async def _proxy_responses_impl(request: Request):
             if transcoder.full_tool_calls:
                 assistant_msg["tool_calls"] = transcoder.full_tool_calls
             msgs.append(assistant_msg)
-            _translator.cache.store(response_id, msgs, body.get("model", "gpt-5.6-sol"), transcoder.usage)
+            _translator.cache.store(response_id, msgs, body.get("model", "gpt-5.6-sol[1m]"), transcoder.usage)
             # Record token usage
             if transcoder.usage is not None:
                 try:
@@ -259,6 +309,16 @@ async def _proxy_responses_impl(request: Request):
             rlog.finish(500)
             return JSONResponse({"error": {"message": f"Streaming failed: {str(_stream_e)}"}}, status_code=500)
     else:
+        # Non-streaming: also dump body for comparison
+        try:
+            _body_dir = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'sent_bodies')
+            _os.makedirs(_body_dir, exist_ok=True)
+            import time as _time3
+            _body_file = _os.path.join(_body_dir, f"req_{_time3.strftime('%H%M%S')}_{len(chat_req.get('messages',[]))}msgs_ns.json")
+            with open(_body_file, 'w', encoding='utf-8') as _bf:
+                json.dump(chat_req, _bf, ensure_ascii=False)
+        except Exception: pass
+
         try:
             upstream_json = await post_non_streaming(
                 chat_req, config.beta_chat_completions_endpoint if use_beta else config.chat_completions_endpoint, config.deepseek_api_key
@@ -274,7 +334,7 @@ async def _proxy_responses_impl(request: Request):
             }, status_code=502)
 
         result = _translator.translate_nonstreaming_response(
-            upstream_json, body, body.get("model", "gpt-5.6-sol"), response_id
+            upstream_json, body, body.get("model", "gpt-5.6-sol[1m]"), response_id
         )
         rlog.finish(200, _translator.last_usage if hasattr(_translator, 'last_usage') else None)
         # Debug: log cache performance for non-streaming
@@ -300,8 +360,7 @@ async def _proxy_responses_impl(request: Request):
 async def get_response(response_id: str):
     cached = _translator.cache.lookup(response_id)
     if cached:
-        cached_model = cached.get("model", "gpt-5.6-sol")
-        # model name returned as-is (no [1m] suffix)
+        cached_model = cached.get("model", "gpt-5.6-sol[1m]")
         return JSONResponse({
             "id": response_id,
             "object": "response",
@@ -311,4 +370,4 @@ async def get_response(response_id: str):
             "usage": None,
         })
     return JSONResponse({"id": response_id, "object": "response", "status": "completed",
-                         "model": "gpt-5.6-sol", "output": [], "usage": None})
+                         "model": "gpt-5.6-sol[1m]", "output": [], "usage": None})

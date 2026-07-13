@@ -32,10 +32,22 @@ class SSETranscoder:
         self._mapper = get_mapper()
 
     def _ensure_codex_model(self, model_name: str) -> str:
-        """Ensure model name is a Codex model name, not upstream DeepSeek name."""
+        """Ensure model name is a Codex model name, not upstream DeepSeek name.
+        
+        CRITICAL: Codex strips [1m] suffix when sending requests, but the model
+        catalog only registers gpt-5.6-sol[1m] with context_window=1050000.
+        If we return gpt-5.6-sol (without [1m]), Codex fails to match it in the
+        catalog and falls back to a default context window (~353K).
+        We must return the [1m] variant so Codex recognizes the model.
+        """
         if isinstance(model_name, str) and "deepseek" in model_name.lower():
             return self._mapper.reverse_responses(model_name)
-        return model_name or "gpt-5.6-sol"
+        # Codex strips [1m] before sending; restore it for catalog matching
+        if model_name and "[1m]" not in model_name:
+            suffixed = model_name + "[1m]"
+            if suffixed in self._mapper._responses_map:
+                return suffixed
+        return model_name or "gpt-5.6-sol[1m]"
 
     def _reset(self):
         self._msg_id = f"msg_{uuid.uuid4().hex[:12]}"

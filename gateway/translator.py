@@ -2,9 +2,77 @@
 Non-streaming path. For streaming see sse_transcoder.py.
 """
 
+import json as _json
 import uuid
 from .mapper import get_mapper
-from .cache_prefix import inject_prefix_chat
+from .inject_codex import inject_prefix_chat
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Message normalization — canonical JSON for DeepSeek disk cache prefix matching.
+#
+# Codex may send semantically identical messages with different JSON formatting
+# between rounds (key ordering, extra null fields, content type normalization).
+# This produces different token sequences, breaking DeepSeek's exact-prefix cache.
+#
+# _normalize_message() produces a canonical representation so the same
+# semantic message always maps to the same JSON bytes → same tokens → cache hit.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _normalize_message(msg: dict) -> dict:
+    """Return a canonical copy of a Chat Completions message dict.
+
+    Rules (in priority order):
+      1. Sort all keys alphabetically at every nesting level.
+      2. Strip null values, empty dicts, and empty arrays.
+      3. Normalize "content": None → removed entirely (DeepSeek accepts missing content).
+      4. For tool_calls: keep id/type/function sub-keys canonical.
+      5. For content arrays: normalize "input_text"/"output_text" → "text",
+         drop input_image items, strip all null fields.
+    """
+    import copy as _copy
+
+    def _canonical(value):
+        """Recursively normalize a JSON-serializable value."""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value
+        if isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            result = []
+            for item in value:
+                normalized = _canonical(item)
+                if normalized is not None:
+                    result.append(normalized)
+            return result if result else None
+        if isinstance(value, dict):
+            result = {}
+            for k in sorted(value.keys()):
+                v = _canonical(value[k])
+                if v is not None:
+                    result[k] = v
+            # Normalize content part types: input_text/output_text → text
+            if "type" in result and result["type"] in ("input_text", "output_text"):
+                result["type"] = "text"
+            # Drop input_image parts — DeepSeek doesn't support them
+            if "type" in result and result["type"] == "input_image":
+                return None
+            return result if result else None
+        return value
+
+    normalized = _canonical(msg)
+    if normalized is None:
+        return {}
+    return normalized
+
+
+def _normalize_messages(messages: list[dict]) -> list[dict]:
+    """Apply _normalize_message to every message in the list."""
+    return [_normalize_message(m) for m in messages]
 
 
 class ResponseCache:
@@ -79,7 +147,11 @@ class ResponsesTranslator:
         if prev_id:
             cached = self.cache.lookup(prev_id)
             if cached:
-                messages = cached["messages"] + messages
+                # Merge consecutive assistant(tool_calls) from cached history BEFORE
+                # processing new input items. Otherwise, reasoning/system messages
+                # inserted between them prevent merging and break tool call chains.
+                merged_cached = self._merge_consecutive_tool_calls(cached["messages"])
+                messages = merged_cached + messages
 
         # GPT-5.6 sends tools via additional_tools input items, not in top-level tools
         _extracted_tools: list[dict] = []
@@ -123,17 +195,12 @@ class ResponsesTranslator:
                             s.get("text", "") for s in (item.get("summary") or [])
                         )
                     continue
-                # Attach pending reasoning to ANY assistant message
-                if pending_reasoning and msg.get("role") == "assistant":
-                    msg["reasoning_content"] = pending_reasoning
-                    pending_reasoning = ""
-                # Attach pending reasoning to the last assistant message if it's the first user/tool msg
-                if pending_reasoning and msg.get("role") in ("user", "tool"):
-                    # Inject reasoning into the previous assistant message in the list
-                    for m in reversed(messages):
-                        if m.get("role") == "assistant":
-                            m["reasoning_content"] = pending_reasoning
-                            break
+                # IMPORTANT: Pending reasoning must NOT be injected into ANY message.
+                # Codex may or may not include reasoning items between turns.
+                # Injecting reasoning_content changes the JSON of messages that
+                # were cached in previous rounds → DeepSeek prefix cache MISS.
+                # We silently consume reasoning to keep the token sequence stable.
+                if pending_reasoning:
                     pending_reasoning = ""
                 messages.append(msg)
 
@@ -145,14 +212,46 @@ class ResponsesTranslator:
         upstream_model = self._mapper.resolve_responses(client_model)
 
 
-        # Post-process: move system messages that interrupt tool call sequences
+        # Post-process: merge consecutive assistant(tool_calls) and
+        # move system messages that interrupt tool call sequences.
         messages = self._merge_consecutive_tool_calls(messages)
         messages = self._fix_tool_call_continuity(messages)
 
-        # Inject stable cache prefix + app instructions into a single system message.
-        # This ensures the token sequence ALWAYS starts with our 13 anchors,
-        # followed by rules, then app-specific instructions.
-        messages = inject_prefix_chat(messages, app_instructions)
+        # Inject stable cache prefix + app instructions as top-level "system" field.
+        # This places the prefix OUTSIDE the messages array so DeepSeek can cache
+        # it independently (matching Anthropic endpoint behavior where "system" is
+        # a top-level field that never changes across rounds).
+        system_content, messages = inject_prefix_chat(messages, app_instructions)
+
+        # Merge ALL system messages from messages[] into the top-level "system" field.
+        # Codex intersperses system messages throughout the conversation (Codex agent
+        # identity, C03 checks, tool checks, turn_aborted markers, model switches, etc.).
+        # Their content changes between rounds → DeepSeek cache breaks at the first
+        # system message that differs. By moving them ALL into the top-level "system"
+        # field (which is static-after-injection), DeepSeek can cache the full prefix.
+        non_system_msgs = []
+        extra_system_parts = []
+        for m in messages:
+            if m.get("role") == "system":
+                content = m.get("content", "")
+                if isinstance(content, list):
+                    # Flatten content arrays: pick text from each part
+                    text_parts = []
+                    for part in content:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            text_parts.append(str(part.get("text", "")))
+                    content = "\n".join(text_parts)
+                if content:
+                    extra_system_parts.append(str(content))
+            else:
+                non_system_msgs.append(m)
+        if extra_system_parts:
+            system_content = system_content + "\n\n---\n\n" + "\n\n---\n\n".join(extra_system_parts)
+        messages = non_system_msgs
+
+        # Normalize all messages to canonical JSON form so the same
+        # semantic message produces the same token sequence across rounds.
+        messages = _normalize_messages(messages)
 
         stream_mode = req.get("stream", False)
         # Sanitize all messages before sending to DeepSeek:
@@ -161,6 +260,7 @@ class ResponsesTranslator:
         clean_messages = _sanitize_content_types(messages)
         chat_req = {
             "model": upstream_model,
+            "system": system_content,
             "messages": clean_messages,
             "stream": stream_mode,
         }
@@ -338,9 +438,14 @@ class ResponsesTranslator:
             if reasoning:
                 assistant_msg["reasoning_content"] = reasoning
             flat_messages.append(assistant_msg)
+        # Merge consecutive assistant(tool_calls) before caching so that
+        # recovery via previous_response_id never sees unmerged tool call chains.
+        flat_messages = self._merge_consecutive_tool_calls(flat_messages)
+        # Normalize to canonical form so recovered messages match current requests.
+        flat_messages = _normalize_messages(flat_messages)
         self.cache.store(response_id, flat_messages, model, chat_resp.get("usage", {}))
 
-        safe_model = model
+        safe_model = self._mapper.reverse_responses(self._mapper.resolve_responses(model))
         return {
             "id": response_id,
             "object": "response",

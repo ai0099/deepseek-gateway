@@ -48,10 +48,16 @@ async def stream_chat_completions(
     """POST a streaming request to upstream Chat Completions endpoint."""
     client = get_upstream_client()
     headers = _build_openai_headers(api_key)
-    return await client.send(
-        client.build_request("POST", endpoint_url, json=body, headers=headers),
-        stream=True,
-    )
+    req = client.build_request("POST", endpoint_url, json=body, headers=headers)
+    # Log the EXACT bytes httpx will send for cross-round comparison
+    import os as _os2, json as _json2, time as _time2
+    _body_dir = _os2.path.join(_os2.path.dirname(_os2.path.dirname(__file__)), 'sent_bodies')
+    _os2.makedirs(_body_dir, exist_ok=True)
+    _msgs = body.get('messages', [])
+    _body_file = _os2.path.join(_body_dir, f"httpx_{_time2.strftime('%H%M%S')}_{len(_msgs)}msgs.json")
+    with open(_body_file, 'wb') as _bf:
+        _bf.write(req.content)
+    return await client.send(req, stream=True)
 
 
 async def post_non_streaming(

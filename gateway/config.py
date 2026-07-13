@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Claude models → real DeepSeek models (for Claude Desktop masquerade)
     model_slots: dict = {
-        "claude-fable-5":              "deepseek-v4-pro[1m]",
+        "claude-fable-5[1m]":           "deepseek-v4-pro[1m]",
     }
 
     # Responses API model mapping (OpenAI model → DeepSeek model)
@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     # DeepSeek Chat Completions API (which does not support the suffix).
     responses_model_map: dict = {
         "gpt-5.5":                    "deepseek-chat",
-        "gpt-5.6-sol":               "deepseek-v4-pro",
+        "gpt-5.6-sol":               "deepseek-v4-pro[1m]",
+        "gpt-5.6-sol[1m]":           "deepseek-v4-pro[1m]",
     }
 
     model_config = {"env_prefix": "DS_GW_", "env_file": ".env", "env_nested_delimiter": "__"}

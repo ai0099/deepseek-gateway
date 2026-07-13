@@ -52,7 +52,7 @@ $cfg["enterpriseConfig"] = @{
     inferenceGatewayApiKey       = $GatewayKey
     inferenceGatewayAuthScheme   = "bearer"
     inferenceModels              = @(
-        "claude-fable-5"
+        "claude-fable-5[1m]"
     )
     disableEssentialTelemetry    = $true
     disableNonessentialTelemetry = $true
