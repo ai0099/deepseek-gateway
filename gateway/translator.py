@@ -238,26 +238,14 @@ class ResponsesTranslator:
         # a top-level field that never changes across rounds).
         system_content, messages = inject_prefix_chat(messages, app_instructions)
 
-        # Merge NON-POSITION-SENSITIVE system messages into the top-level "system"
-        # field. Codex intersperses three categories of system messages:
-        #
-        #   STATIC (3):  Agent identity, role, multi_agent_mode — merge ✓
-        #   DYNAMIC (83): C03/Tool checks, PS process lists — merge ✓
-        #   CONTEXT (11): turn_aborted, model_switch, collaboration_mode — KEEP IN PLACE
-        #
-        # CONTEXT messages mark specific points in the conversation timeline and
-        # must stay where they are for the model to understand interruptions,
-        # model switches, and collaboration mode changes. Their content is static
-        # across rounds (same turn_aborted text every time), so keeping them in
-        # messages[] does NOT break cache — only new ones append at the end.
-        _KEEP_IN_PLACE_KEYWORDS = (
-            "turn_aborted",
-            "model_switch",
-            "collaboration_mode",
-            "Collaboration Mode",
-        )
-        non_system_msgs = []
+        # Extract ALL system messages from messages[] into the top-level "system"
+        # field. Codex intersperses ~97 system messages throughout the conversation
+        # (agent identity, C03/Tool checks, turn_aborted, model_switch, PS lists,
+        # permissions, etc.). Moving them ALL to system makes messages[] a pure
+        # append-only conversation stream, enabling DeepSeek exact-prefix cache
+        # across rounds. No keep-in-place exceptions — all system msgs go to system.
         extra_system_parts = []
+        clean_messages_temp = []
         for m in messages:
             if m.get("role") == "system":
                 content = m.get("content", "")
@@ -268,16 +256,13 @@ class ResponsesTranslator:
                             text_parts.append(str(part.get("text", "")))
                     content = "\n".join(text_parts)
                 content_str = str(content)
-                # Position-sensitive messages stay in place
-                if any(kw in content_str for kw in _KEEP_IN_PLACE_KEYWORDS):
-                    non_system_msgs.append(m)
-                elif content_str:
+                if content_str:
                     extra_system_parts.append(content_str)
             else:
-                non_system_msgs.append(m)
+                clean_messages_temp.append(m)
         if extra_system_parts:
             system_content = system_content + "\n\n---\n\n" + "\n\n---\n\n".join(extra_system_parts)
-        messages = non_system_msgs
+        messages = clean_messages_temp
 
         # Normalize all messages to canonical JSON form so the same
         # semantic message produces the same token sequence across rounds.
