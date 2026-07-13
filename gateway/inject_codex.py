@@ -193,18 +193,18 @@ _WARNING_TEXT = (
 
 
 def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, str, list[dict]]:
-    """Codex Chat Completions 前缀注入 — split anchors (system) / files (messages[0]).
+    """Codex Chat Completions 前缀注入 — dual top-level fields.
 
     注入顺序：
       - system field: 26 条 Codex 锚点 only
-      - messages[0]: CLAUDE.md + SKILL.md + all rules (Codex can read this layer)
+      - user field (top-level): 规则文件（CLAUDE.md + SKILL.md + rules），对 DeepSeek 可见，对 Codex 客户端可见
 
     Args:
         messages: 已有的消息列表
         extra_content: 额外的指令内容（如 app_instructions）
 
     Returns:
-        (system_content, files_content, messages) — system 只含锚点，files 作为 messages[0]
+        (system_content, user_content, messages) — system 和 user 都是顶层字段，messages 不变
     """
     system_content = _ANCHOR_STRING
 

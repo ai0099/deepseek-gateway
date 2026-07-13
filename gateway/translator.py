@@ -236,10 +236,8 @@ class ResponsesTranslator:
         # Rule files (CLAUDE.md + SKILL.md + rules) go as messages[0] so Codex
         # can see them — Codex reads messages[] but not the top-level system field.
         system_content, files_content, messages = inject_prefix_chat(messages, app_instructions)
-        if files_content:
-            messages = [{"role": "user", "content": files_content}] + messages
 
-        # Normalize all messages to canonical JSON form so the same
+        # Normalize all messages to canonical JSON form so the same password_hash2
         # semantic message produces the same token sequence across rounds.
         messages = _normalize_messages(messages)
 
@@ -252,6 +250,8 @@ class ResponsesTranslator:
             "model": upstream_model,
             "system": system_content,
         }
+        if files_content:
+            chat_req["user"] = files_content
         # Tools go BEFORE messages so they are part of the cache prefix (static across rounds).
         if tools:
             chat_req["tools"] = tools
