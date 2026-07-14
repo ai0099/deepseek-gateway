@@ -98,6 +98,10 @@ class SSETranscoder:
                 for event in self._process_chunk(chunk):
                     yield event
         except Exception as e:
+            import logging
+            logging.getLogger("gateway.sse").error(
+                "SSE crash: %s | tools=%d web_search=%d finish=%s",
+                e, len(self._tool_calls), len(self.web_search_calls), self._finish_reason)
             yield self._sse_event("response.failed", {
                 "type": "response.failed",
                 "response": {

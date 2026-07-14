@@ -28,14 +28,15 @@ async def proxy_responses(request: Request):
     try:
         return await _proxy_responses_impl(request)
     except Exception as _top_e:
-        import traceback as _tb, os as _os, logging as _logging
+        import traceback as _tb, os as _os, logging as _logging, time as _t3
         _log = _logging.getLogger("gateway")
         _log.error("proxy_responses FATAL: %s\n%s", _top_e, _tb.format_exc())
-        # Also write to a dedicated crash log
         try:
             _crash = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "crash_responses.log")
             with open(_crash, "a", encoding="utf-8") as _f:
-                _f.write(f"\n=== CRASH ===\n{_top_e}\n{_tb.format_exc()}\n")
+                _f.write(f"\n=== CRASH [{_t3.strftime('%Y-%m-%d %H:%M:%S')}] ===\n")
+                _f.write(f"Error: {type(_top_e).__name__}: {_top_e}\n")
+                _f.write(f"{_tb.format_exc()}\n")
         except Exception: pass
         return JSONResponse({"error": {"message": str(_top_e)}}, status_code=500)
 
@@ -183,6 +184,22 @@ async def _proxy_responses_impl(request: Request):
                 async for event in transcoder.transcode_stream(upstream_resp):
                     _events.append(event)
             except Exception as _e:
+                import traceback as _tb, logging as _log2, time as _t2, os as _os2
+                _logger = _log2.getLogger("gateway")
+                _logger.error("STREAM_CRASH: %s | tool_calls=%d web_search=%d",
+                             _e, len(getattr(transcoder, '_tool_calls', [])),
+                             len(transcoder.web_search_calls))
+                # Write to debug_errors.log with full context
+                try:
+                    _err_log = _os2.path.join(_os2.path.dirname(_os2.path.dirname(__file__)), "debug_errors.log")
+                    with open(_err_log, "a", encoding="utf-8") as _f:
+                        _f.write(f"\n[{_t2.strftime('%H:%M:%S')}] STREAM_CRASH: {type(_e).__name__}: {_e}\n")
+                        _f.write(f"  response_id={response_id}\n")
+                        _f.write(f"  events_buffered={len(_events)}\n")
+                        _f.write(f"  tool_calls={len(getattr(transcoder,'_tool_calls',[]))}|{len(transcoder.web_search_calls)}\n")
+                        _f.write(f"  finish_reason={getattr(transcoder,'_finish_reason','?')}\n")
+                        _f.write(f"{_tb.format_exc()}\n")
+                except Exception: pass
                 _events.append(transcoder._sse_event("response.failed", {
                     "type": "response.failed",
                     "response": {"id": transcoder._response_id, "status": "failed",
