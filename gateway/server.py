@@ -12,55 +12,74 @@ from .upstream import get_upstream_client, close_upstream_client
 
 
 async def _warmup_cache(config):
-    """Send a minimal request to DeepSeek to pre-build the KV cache prefix.
+    """Send minimal requests to pre-build KV cache for BOTH Claude and Codex routes.
 
-    DeepSeek's disk cache is built on first use — without warmup, the first
-    real request has 0% cache hit on the rules prefix. This sends a dummy
-    request with the same anchor + rules prefix so subsequent real requests
-    hit the cache immediately.
+    DeepSeek disk cache is built on first use. Without warmup, first real request
+    has 0% cache hit. Claude and Codex have different prefixes and endpoints,
+    so both must be warmed separately.
     """
+    client = get_upstream_client()
+
+    # ── Codex route (Chat Completions endpoint) ──
     try:
-        from .inject_codex import inject_prefix_chat, _ANCHOR_BLOCK
-        from .upstream import post_non_streaming
-
-        # Build minimal chat_req with anchor + rules + short user message
-        _, file_messages, _ = inject_prefix_chat([], "")
-        chat_req = {
-            "model": "deepseek-v4-pro",
-            "messages": file_messages + [
-                {"role": "user", "content": "ping"}  # minimal user message
-            ],
-            "stream": False,
-            "max_tokens": 1,
-            "thinking": {"type": "enabled"},
-        }
-
-        client = get_upstream_client()
-        headers = {
-            "Authorization": f"Bearer {config.deepseek_api_key}",
-            "content-type": "application/json",
-        }
+        from .inject_codex import inject_prefix_chat
+        _, fm, _ = inject_prefix_chat([], "")
         resp = await client.post(
             config.chat_completions_endpoint,
-            json=chat_req,
-            headers=headers,
+            json={
+                "model": "deepseek-v4-pro",
+                "messages": fm + [{"role": "user", "content": "ping"}],
+                "stream": False,
+                "max_tokens": 1,
+                "thinking": {"type": "enabled"},
+            },
+            headers={
+                "Authorization": f"Bearer {config.deepseek_api_key}",
+                "content-type": "application/json",
+            },
             timeout=30.0,
         )
         if resp.status_code == 200:
-            data = resp.json()
-            usage = data.get("usage", {})
-            hit = usage.get("prompt_cache_hit_tokens", 0)
-            miss = usage.get("prompt_cache_miss_tokens", 0)
-            total = hit + miss
-            hit_rate = round(hit / total * 100, 1) if total > 0 else 0
-            print(f"\n  >>> [warmup] Cache warmup OK — {total/1e3:.1f}K tokens, "
-                  f"{hit_rate:.0f}% hit (expected ~0% on first warmup)\n")
+            u = resp.json().get("usage", {})
+            h = u.get("prompt_cache_hit_tokens", 0)
+            m = u.get("prompt_cache_miss_tokens", 0)
+            t = h + m
+            print(f"\n  >>> [warmup:codex] OK {t/1e3:.1f}K tokens "
+                  f"{round(h/t*100) if t else 0}% hit\n")
         else:
-            print(f"  [warmup] Cache warmup returned {resp.status_code} — "
-                  f"cache may not be pre-built")
+            print(f"  [warmup:codex] HTTP {resp.status_code}")
     except Exception as e:
-        print(f"  [warmup] Cache warmup failed: {e} — "
-              f"first real request will build cache")
+        print(f"  [warmup:codex] failed: {e}")
+
+    # ── Claude route (Anthropic endpoint) ──
+    try:
+        from .inject_rules import _INJECTION_STRING
+        resp = await client.post(
+            config.anthropic_endpoint + "/v1/messages",
+            json={
+                "model": "deepseek-v4-pro[1m]",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "ping"}],
+                "system": _INJECTION_STRING + "\n\nping",
+                "thinking": {"type": "enabled"},
+            },
+            headers={
+                "x-api-key": config.deepseek_api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            timeout=30.0,
+        )
+        if resp.status_code == 200:
+            u = resp.json().get("usage", {})
+            h = u.get("cache_read_input_tokens", 0)
+            t = u.get("input_tokens", 0)
+            print(f"  >>> [warmup:claude] OK {t/1e3:.1f}K tokens "
+                  f"{round(h/t*100) if t else 0}% hit\n")
+        else:
+            print(f"  [warmup:claude] HTTP {resp.status_code}")
+    except Exception as e:
+        print(f"  [warmup:claude] failed: {e}")
 
 
 @asynccontextmanager
@@ -70,7 +89,6 @@ async def lifespan(app: FastAPI):
     get_upstream_client()
 
     if config.is_configured:
-        # Run cache warmup in background — don't block server startup
         _task = _asyncio.create_task(_warmup_cache(config))
 
     yield
@@ -94,7 +112,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Catch-all request logger
     @app.middleware("http")
     async def log_all_requests(request, call_next):
         config = load_config()
@@ -127,36 +144,14 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health():
         config = load_config()
-        return {
-            "status": "ok",
-            "configured": config.is_configured,
-            "anthropic_endpoint": config.anthropic_endpoint,
-        }
+        return {"status": "ok", "configured": config.is_configured}
 
     @app.get("/")
     async def root():
-        return {
-            "service": "DeepSeek Gateway",
-            "version": "1.0.0",
-            "endpoints": {
-                "anthropic": "/anthropic/v1/messages",
-                "models": "/v1/models",
-                "responses": "/v1/responses",
-                "health": "/health",
-            },
-        }
+        return {"service": "DeepSeek Gateway", "version": "1.0.0"}
 
-    # Catch-all route to log unmatched requests (debugging)
     @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
     async def catch_all(request, full_path: str):
-        config = load_config()
-        if config.debug:
-            import os as _os
-            _debug_log = _os.path.join(_os.path.dirname(__file__), "..", "debug_requests.log")
-            try:
-                with open(_debug_log, "a", encoding="utf-8") as _f:
-                    _f.write(f"[UNMATCHED] {request.method} /{full_path} from {request.client.host if request.client else chr(63)}")
-            except Exception: pass
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "not found", "path": f"/{full_path}"}, status_code=404)
 
