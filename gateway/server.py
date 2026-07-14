@@ -12,11 +12,11 @@ from .upstream import get_upstream_client, close_upstream_client
 
 
 async def _warmup_cache(config):
-    """Send minimal requests to pre-build KV cache for BOTH Claude and Codex routes.
+    """Send a warmup request for the Codex route (Chat Completions endpoint).
 
-    DeepSeek disk cache is built on first use. Without warmup, first real request
-    has 0% cache hit. Claude and Codex have different prefixes and endpoints,
-    so both must be warmed separately.
+    Claude/Anthropic route warmup is NOT possible because the Anthropic API
+    caches the system field as an atomic unit, and Claude Code's system
+    prompt varies per session — we can't predict it for warmup.
     """
     client = get_upstream_client()
 
@@ -50,37 +50,6 @@ async def _warmup_cache(config):
             print(f"  [warmup:codex] HTTP {resp.status_code}")
     except Exception as e:
         print(f"  [warmup:codex] failed: {type(e).__name__}: {e}")
-
-    # ── Claude route (Anthropic endpoint) ──
-    try:
-        from .inject_rules import _INJECTION_STRING
-        resp = await client.post(
-            config.anthropic_endpoint + "/v1/messages",
-            json={
-                "model": "deepseek-v4-pro[1m]",
-                "max_tokens": 1,
-                "messages": [{"role": "user", "content": "ping"}],
-                "system": _INJECTION_STRING,  # exact prefix, no suffix
-                "thinking": {"type": "enabled"},
-            },
-            headers={
-                "x-api-key": config.deepseek_api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            timeout=30.0,
-        )
-        if resp.status_code == 200:
-            u = resp.json().get("usage", {})
-            cached = u.get("cache_read_input_tokens", 0)
-            uncached = u.get("input_tokens", 0)  # Anthropic: input_tokens = uncached
-            total = cached + uncached
-            print(f"  >>> [warmup:claude] OK {total/1e3:.1f}K tokens "
-                  f"({cached/1e3:.1f}K cached, {round(cached/total*100) if total else 0}% hit)\n")
-        else:
-            print(f"  [warmup:claude] HTTP {resp.status_code}")
-    except Exception as e:
-        print(f"  [warmup:claude] failed: {type(e).__name__}: {e}")
 
 
 @asynccontextmanager
