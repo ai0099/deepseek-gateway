@@ -1,0 +1,8 @@
+https://deepseekv4.wiki/en/tutorials/deepseek-v4-codex-integration
+https://github.com/mmm1h/deepseek-openai-proxy
+https://github.com/wangyuhao0507/deepseek-cache-gateway
+https://github.com/NewbieGameCoder/DeepSeekCache
+https://github.com/rohaquinlop/pi-deepseek-cache
+https://docs.bswen.com/blog/2026-06-05-deepseek-prompt-caching-98-percent/
+https://www.reddit.com/r/DeepSeek/comments/1u8twzw/codex_deepseek_the_future/
+https://news.ycombinator.com/item?id=48256953

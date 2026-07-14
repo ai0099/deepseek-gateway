@@ -1,6 +1,7 @@
-"""FastAPI application factory."""
+"""FastAPI application factory — with cache warmup on startup."""
 
 import os as _os
+import asyncio as _asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,12 +11,70 @@ from .logger import setup_logging, rotate_log_file
 from .upstream import get_upstream_client, close_upstream_client
 
 
+async def _warmup_cache(config):
+    """Send a minimal request to DeepSeek to pre-build the KV cache prefix.
+
+    DeepSeek's disk cache is built on first use — without warmup, the first
+    real request has 0% cache hit on the rules prefix. This sends a dummy
+    request with the same anchor + rules prefix so subsequent real requests
+    hit the cache immediately.
+    """
+    try:
+        from .inject_codex import inject_prefix_chat, _ANCHOR_BLOCK
+        from .upstream import post_non_streaming
+
+        # Build minimal chat_req with anchor + rules + short user message
+        _, file_messages, _ = inject_prefix_chat([], "")
+        chat_req = {
+            "model": "deepseek-v4-pro",
+            "messages": file_messages + [
+                {"role": "user", "content": "ping"}  # minimal user message
+            ],
+            "stream": False,
+            "max_tokens": 1,
+            "thinking": {"type": "enabled"},
+        }
+
+        client = get_upstream_client()
+        headers = {
+            "Authorization": f"Bearer {config.deepseek_api_key}",
+            "content-type": "application/json",
+        }
+        resp = await client.post(
+            config.chat_completions_endpoint,
+            json=chat_req,
+            headers=headers,
+            timeout=30.0,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            usage = data.get("usage", {})
+            hit = usage.get("prompt_cache_hit_tokens", 0)
+            miss = usage.get("prompt_cache_miss_tokens", 0)
+            total = hit + miss
+            hit_rate = round(hit / total * 100, 1) if total > 0 else 0
+            print(f"  [warmup] Cache warmup OK — {total/1e3:.1f}K tokens, "
+                  f"{hit_rate:.0f}% hit (expected ~0% on first warmup)")
+        else:
+            print(f"  [warmup] Cache warmup returned {resp.status_code} — "
+                  f"cache may not be pre-built")
+    except Exception as e:
+        print(f"  [warmup] Cache warmup failed: {e} — "
+              f"first real request will build cache")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config = load_config()
     setup_logging(config.log_level)
     get_upstream_client()
+
+    if config.is_configured:
+        # Run cache warmup in background — don't block server startup
+        _task = _asyncio.create_task(_warmup_cache(config))
+
     yield
+
     await close_upstream_client()
 
 
