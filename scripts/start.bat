@@ -1,4 +1,4 @@
 @echo off
 cd /d "E:\Claude\deepseek-gateway"
-"C:\Users\Administrator\.claude\venv\Scripts\python.exe" "E:\Claude\deepseek-gateway\scripts\launch.py"
+powershell -ExecutionPolicy Bypass -File "E:\Claude\deepseek-gateway\scripts\start.ps1"
 exit
