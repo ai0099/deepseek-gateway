@@ -1,3 +1,0 @@
-https://codex.danielvaughan.com/2026/04/21/codex-cli-prompt-caching-maximise-cache-hits-cost-reduction/
-https://github.com/JetXu-LLM/codex-deepseek-bridge
-https://docs.bswen.com/blog/2026-06-05-deepseek-prompt-caching-98-percent/
