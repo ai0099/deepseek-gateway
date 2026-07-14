@@ -256,11 +256,10 @@ class ResponsesTranslator:
         chat_req = {
             "model": upstream_model,
             "messages": static_prefix + clean_messages,
+            "stream": stream_mode,
         }
-        # Tools go BEFORE messages so they are part of the cache prefix (static across rounds).
         if tools:
             chat_req["tools"] = tools
-        chat_req["stream"] = stream_mode
         # Always enable DeepSeek thinking mode
         chat_req["thinking"] = {"type": "enabled"}
         # Map reasoning effort: Codex "ultra" → DeepSeek "max" (DeepSeek doesn't support "ultra")
