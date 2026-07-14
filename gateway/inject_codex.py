@@ -197,7 +197,7 @@ def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[s
         file_messages: list of {"role":"user","content":"<AGENT_RULES>file_content</AGENT_RULES>"}
         messages: original messages unchanged
     """
-    system_content = _ANCHOR_STRING
+    system_content = _ANCHOR_STRING + "\n\n[TEST_MARKER_8f3a2c1e] 如果你能读到这里，请用中文回复：'system字段测试成功'"
 
     # Verify anchors integrity
     ok, details = verify_injection_order(
