@@ -198,36 +198,28 @@ _WARNING_TEXT = (
 
 
 def inject_system_prefix(system, verify: bool = True):
-    """将完整注入字符串插入 system list[0]（或 string 头部）。
+    """将 INJECTION 作为 system[0]，Claude 原始提示作为 system[1]，两个独立 block。
 
-    如果 verify=True 且验证失败，在 system list 末尾追加警告文本块。
+    DeepSeek 可能对 system 数组中不同 block 独立缓存。INJECTION(256K)永远
+    不变，Claude 原始提示在 system[1]，变化不影响 system[0] 的缓存。
     """
+    inject_block = {"type": "text", "text": _INJECTION_STRING}
+
     if system is None:
-        return _INJECTION_STRING
+        result = [inject_block]
+    elif isinstance(system, str):
+        result = [inject_block, {"type": "text", "text": system}]
+    elif isinstance(system, list):
+        result = [inject_block] + list(system)
+    else:
+        result = [inject_block]
 
-    if isinstance(system, str):
-        injected = _INJECTION_STRING + "\n\n" + system
-        if verify:
-            ok, details = verify_injection_order(injected)
-            if not ok:
-                injected += _WARNING_TEXT
-        return injected
+    if verify:
+        ok, details = verify_injection_order(result)
+        if not ok:
+            result.append({"type": "text", "text": _WARNING_TEXT})
 
-    if isinstance(system, list):
-        # 注入块作为单个 text dict 插入 list[0]
-        inject_block = {"type": "text", "text": _INJECTION_STRING}
-        separator = {"type": "text", "text": "\n\n"}
-        result = [inject_block, separator] + list(system)
-
-        if verify:
-            ok, details = verify_injection_order(result)
-            if not ok:
-                # 在末尾追加警告
-                result.append({"type": "text", "text": _WARNING_TEXT})
-
-        return result
-
-    return system
+    return result
 
 
 def get_anchor_messages() -> list[dict]:
