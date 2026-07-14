@@ -246,7 +246,7 @@ class ResponsesTranslator:
 
         # Build chat_req with stable fields first (for deterministic JSON order).
         # Stable fields (same across all requests): model, messages, stream, thinking,
-        # reasoning_effort, max_tokens, stream_options, tool_choice.
+        # reasoning_effort, max_tokens, stream_options, tool_choice, user_id.
         # Variable fields (may change): tools, temperature, top_p, response_format.
         chat_req = {
             "model": upstream_model,
@@ -265,9 +265,15 @@ class ResponsesTranslator:
         if stream_mode:
             chat_req["stream_options"] = {"include_usage": True}
         chat_req["tool_choice"] = req.get("tool_choice", "auto")
+        # Deterministic user_id — pins all Codex requests to same DeepSeek cache pool
+        # (see DEEPSEEK_CACHE_GUIDE.md §3-F: cross-instance cache isolation)
+        chat_req["user_id"] = "codex-gw"
 
         # Variable fields — appended after stable fields
         if tools:
+            # Sort tools by name for deterministic JSON (prevents cache breaks from
+            # random tool ordering — see DEEPSEEK_CACHE_GUIDE.md §3-C)
+            tools.sort(key=lambda t: t.get("function", {}).get("name", ""))
             chat_req["tools"] = tools
         if req.get("response_format"):
             chat_req["response_format"] = req["response_format"]

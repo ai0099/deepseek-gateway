@@ -49,15 +49,15 @@ async def stream_chat_completions(
     client = get_upstream_client()
     headers = _build_openai_headers(api_key)
     req = client.build_request("POST", endpoint_url, json=body, headers=headers)
-    # Log the EXACT bytes httpx will send for cross-round comparison
-    import os as _os2, json as _json2, time as _time2
-    _body_dir = _os2.path.join(_os2.path.dirname(_os2.path.dirname(__file__)), 'sent_bodies')
-    _os2.makedirs(_body_dir, exist_ok=True)
-    _msgs = body.get('messages', [])
-    _body_file = _os2.path.join(_body_dir, f"httpx_{_time2.strftime('%H%M%S')}_{len(_msgs)}msgs.json")
-    with open(_body_file, 'wb') as _bf:
-        _bf.write(req.content)
-    return await client.send(req, stream=True)
+    resp = await client.send(req, stream=True)
+    if resp.status_code >= 400:
+        error_body = ""
+        try:
+            error_body = (await resp.aread()).decode("utf-8", errors="replace")[:1000]
+        except Exception:
+            pass
+        raise Exception(f"Upstream {resp.status_code}: {error_body}")
+    return resp
 
 
 async def post_non_streaming(
