@@ -49,7 +49,7 @@ async def _warmup_cache(config):
         else:
             print(f"  [warmup:codex] HTTP {resp.status_code}")
     except Exception as e:
-        print(f"  [warmup:codex] failed: {e}")
+        print(f"  [warmup:codex] failed: {type(e).__name__}: {e}")
 
     # ── Claude route (Anthropic endpoint) ──
     try:
@@ -79,7 +79,7 @@ async def _warmup_cache(config):
         else:
             print(f"  [warmup:claude] HTTP {resp.status_code}")
     except Exception as e:
-        print(f"  [warmup:claude] failed: {e}")
+        print(f"  [warmup:claude] failed: {type(e).__name__}: {e}")
 
 
 @asynccontextmanager
