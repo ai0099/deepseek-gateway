@@ -110,7 +110,7 @@ _EXPECTED_FILE_NAMES = [p.name for p in _INJECTION_FILE_PATHS]
 
 _INJECTION_STRING: str = ""
 _ANCHOR_STRING: str = ""          # 26 anchors only — for top-level system
-_FILES_STRING: str = ""           # CLAUDE.md + SKILL.md + rules — for messages[0]
+_FILE_PARTS: list = []            # individual file contents — for separate messages
 _LOADED_COUNT: int = 0
 
 
@@ -123,28 +123,24 @@ def _read(path: _Path) -> str:
 
 
 def _build_injection_string() -> str:
-    """Build injection strings: anchors-only for system field, files for messages[0]."""
-    global _INJECTION_STRING, _ANCHOR_STRING, _FILES_STRING, _LOADED_COUNT
+    """Build injection strings: anchors for system field, individual files for messages."""
+    global _INJECTION_STRING, _ANCHOR_STRING, _FILE_PARTS, _LOADED_COUNT
 
     _ANCHOR_STRING = _ANCHOR_BLOCK
 
-    loaded = 0
-    file_parts = []
+    _FILE_PARTS = []
     for p in _INJECTION_FILE_PATHS:
         content = _read(p)
         if content:
-            file_parts.append(content)
-            loaded += 1
+            _FILE_PARTS.append(content)
 
-    _LOADED_COUNT = loaded
-    _raw = _SEPARATOR.join(file_parts) if file_parts else ""
-    _FILES_STRING = f"<AGENT_RULES>\n{_raw}\n</AGENT_RULES>" if _raw else ""
+    _LOADED_COUNT = len(_FILE_PARTS)
     _INJECTION_STRING = _ANCHOR_STRING  # keep backwards compat for verify
 
-    total_chars = len(_ANCHOR_STRING) + len(_FILES_STRING)
     expected = len(_INJECTION_FILE_PATHS)
     status = "OK" if _verify_anchors_integrity() else "SHA256 MISMATCH!"
-    print(f"  [inject_codex] Loaded {loaded}/{expected} files -> anchors: {len(_ANCHOR_STRING):,} chars, files: {len(_FILES_STRING):,} chars | anchors: {status}")
+    total_chars = len(_ANCHOR_STRING) + sum(len(p) for p in _FILE_PARTS)
+    print(f"  [inject_codex] Loaded {_LOADED_COUNT}/{expected} files -> anchors: {len(_ANCHOR_STRING):,} chars, {len(_FILE_PARTS)} individual files ({total_chars:,} total chars) | anchors: {status}")
     return _INJECTION_STRING
 
 
@@ -192,19 +188,14 @@ _WARNING_TEXT = (
 )
 
 
-def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, str, list[dict]]:
-    """Codex Chat Completions 前缀注入 — dual top-level fields.
-
-    注入顺序：
-      - system field: 26 条 Codex 锚点 only
-      - user field (top-level): 规则文件（CLAUDE.md + SKILL.md + rules），对 DeepSeek 可见，对 Codex 客户端可见
-
-    Args:
-        messages: 已有的消息列表
-        extra_content: 额外的指令内容（如 app_instructions）
+def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, list[dict], list[dict]]:
+    """Codex Chat Completions 前缀注入 — individual files as separate messages.
 
     Returns:
-        (system_content, user_content, messages) — system 和 user 都是顶层字段，messages 不变
+        (system_content, file_messages, messages)
+        system_content: 26 anchors as string for top-level system field
+        file_messages: list of {"role":"user","content":"<AGENT_RULES>file_content</AGENT_RULES>"}
+        messages: original messages unchanged
     """
     system_content = _ANCHOR_STRING
 
@@ -215,8 +206,11 @@ def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[s
     if not ok:
         system_content = _ANCHOR_STRING + _WARNING_TEXT
 
-    files_content = _FILES_STRING
+    file_messages = []
+    for content in _FILE_PARTS:
+        wrapped = f"<AGENT_RULES>\n{content}\n</AGENT_RULES>"
+        file_messages.append({"role": "user", "content": wrapped})
     if extra_content:
-        files_content = _FILES_STRING + "\n\n" + extra_content if _FILES_STRING else extra_content
+        file_messages.append({"role": "user", "content": extra_content})
 
-    return system_content, files_content, messages
+    return system_content, file_messages, messages
