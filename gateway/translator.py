@@ -278,6 +278,8 @@ class ResponsesTranslator:
             chat_req["temperature"] = req["temperature"]
         if req.get("max_output_tokens"):
             chat_req["max_tokens"] = req["max_output_tokens"]
+        else:
+            chat_req["max_tokens"] = 65536  # default to avoid DeepSeek output truncation
         if req.get("top_p") is not None:
             chat_req["top_p"] = req["top_p"]
 
