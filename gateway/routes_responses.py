@@ -106,7 +106,7 @@ async def _proxy_responses_impl(request: Request):
 
         # Hash ALL non-system messages with positional checkpoints
         # AND log raw JSON of key messages for cross-round comparison
-        _cache_msgs = msgs  # no system msg in messages — system is top-level field
+        _cache_msgs = msgs  # includes merged system msg at [0]
         _all_hashes = []
         _debug_snapshots = []  # raw JSON of important messages
         for _idx, _m in enumerate(_cache_msgs):

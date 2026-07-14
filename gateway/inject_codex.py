@@ -189,30 +189,34 @@ _WARNING_TEXT = (
 
 
 def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, list[dict], list[dict]]:
-    """Codex Chat Completions prefix injection — all rules merged into system field.
+    """Codex Chat Completions prefix injection — all rules merged into one system message.
 
-    Merges anchors + all rule files + extra_content into a single system string,
-    matching the Claude route's approach for optimal DeepSeek KV cache hit rate.
+    Merges anchors + all rule files + extra_content into a single system message
+    at messages[0]. DeepSeek Chat Completions does NOT support a top-level
+    'system' field — system messages must use {"role":"system"} inside the
+    messages array.
 
     Returns:
         (system_content, file_messages, messages)
-        system_content: anchors + all AGENT_RULES files joined as one string
-        file_messages: always empty (all content merged into system_content)
+        system_content: always empty (all content merged into file_messages[0])
+        file_messages: [{"role":"system","content":"<all_rules>"}]
         messages: original messages unchanged
     """
-    # Build system_content: anchors + all rule files + extra_content
+    # Build merged content: anchors + all rule files + extra_content
     parts = [_ANCHOR_STRING]
     for content in _FILE_PARTS:
         parts.append(f"<AGENT_RULES>\n{content}\n</AGENT_RULES>")
     if extra_content:
         parts.append(extra_content)
-    system_content = "\n\n".join(parts)
+    merged = "\n\n".join(parts)
 
     # Verify anchors integrity
     ok, details = verify_injection_order(
         [{"role": "system", "content": _ANCHOR_STRING}] + messages
     )
     if not ok:
-        system_content = _ANCHOR_STRING + _WARNING_TEXT + "\n\n" + system_content[len(_ANCHOR_STRING):]
+        merged = _ANCHOR_STRING + _WARNING_TEXT + "\n\n" + merged[len(_ANCHOR_STRING):]
 
-    return system_content, [], messages
+    # Return as one system message in file_messages, empty system_content
+    file_messages = [{"role": "system", "content": merged}]
+    return "", file_messages, messages

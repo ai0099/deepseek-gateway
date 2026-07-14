@@ -232,9 +232,9 @@ class ResponsesTranslator:
         messages = self._reorder_tool_responses(messages)
         messages = self._fix_tool_call_continuity(messages)
 
-        # Inject stable cache prefix as top-level "system" field.
-        # All rules (anchors + files) merged into one system string so DeepSeek
-        # can cache the entire rule block as a single prefix unit.
+        # Inject stable cache prefix as the first system message.
+        # All rules (anchors + files) merged into ONE system message at messages[0].
+        # DeepSeek Chat Completions does NOT support a top-level "system" field.
         system_content, file_messages, messages = inject_prefix_chat(messages, app_instructions)
 
         # Normalize all messages to canonical JSON form so the same
@@ -244,10 +244,10 @@ class ResponsesTranslator:
         stream_mode = req.get("stream", False)
         clean_messages = _sanitize_content_types(messages)
 
+        # file_messages contains the single merged system message; prepend to messages
         chat_req = {
             "model": upstream_model,
-            "system": system_content,
-            "messages": clean_messages,
+            "messages": file_messages + clean_messages,
             "stream": stream_mode,
         }
         if tools:
