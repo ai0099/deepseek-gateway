@@ -60,7 +60,7 @@ async def _warmup_cache(config):
                 "model": "deepseek-v4-pro[1m]",
                 "max_tokens": 1,
                 "messages": [{"role": "user", "content": "ping"}],
-                "system": _INJECTION_STRING + "\n\nping",
+                "system": _INJECTION_STRING,  # exact prefix, no suffix
                 "thinking": {"type": "enabled"},
             },
             headers={
@@ -72,10 +72,11 @@ async def _warmup_cache(config):
         )
         if resp.status_code == 200:
             u = resp.json().get("usage", {})
-            h = u.get("cache_read_input_tokens", 0)
-            t = u.get("input_tokens", 0)
-            print(f"  >>> [warmup:claude] OK {t/1e3:.1f}K tokens "
-                  f"{round(h/t*100) if t else 0}% hit\n")
+            cached = u.get("cache_read_input_tokens", 0)
+            uncached = u.get("input_tokens", 0)  # Anthropic: input_tokens = uncached
+            total = cached + uncached
+            print(f"  >>> [warmup:claude] OK {total/1e3:.1f}K tokens "
+                  f"({cached/1e3:.1f}K cached, {round(cached/total*100) if total else 0}% hit)\n")
         else:
             print(f"  [warmup:claude] HTTP {resp.status_code}")
     except Exception as e:
