@@ -242,21 +242,24 @@ class ResponsesTranslator:
         messages = _normalize_messages(messages)
 
         stream_mode = req.get("stream", False)
-        # Sanitize all messages before sending to DeepSeek:
-        # DeepSeek Chat Completions only accepts {"type":"text"} content parts,
-        # not "input_text" or "output_text" (Responses API types).
         clean_messages = _sanitize_content_types(messages)
+
+        # Anchors as messages[0] (role:system), then rule files as messages[1..N]
+        # DeepSeek Chat Completions caches the messages array prefix — putting
+        # anchors first ensures they're in the cached range before the files.
+        static_prefix = []
+        if system_content:
+            static_prefix.append({"role": "system", "content": system_content})
+        if file_messages:
+            static_prefix.extend(file_messages)
+
         chat_req = {
             "model": upstream_model,
-            "system": system_content,
+            "messages": static_prefix + clean_messages,
         }
-        # Prepend each rule file as a separate message
-        if file_messages:
-            clean_messages = file_messages + clean_messages
         # Tools go BEFORE messages so they are part of the cache prefix (static across rounds).
         if tools:
             chat_req["tools"] = tools
-        chat_req["messages"] = clean_messages
         chat_req["stream"] = stream_mode
         # Always enable DeepSeek thinking mode
         chat_req["thinking"] = {"type": "enabled"}
