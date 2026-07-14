@@ -244,36 +244,35 @@ class ResponsesTranslator:
         stream_mode = req.get("stream", False)
         clean_messages = _sanitize_content_types(messages)
 
-        # file_messages contains the single merged system message; prepend to messages
+        # Build chat_req with stable fields first (for deterministic JSON order).
+        # Stable fields (same across all requests): model, messages, stream, thinking,
+        # reasoning_effort, max_tokens, stream_options, tool_choice.
+        # Variable fields (may change): tools, temperature, top_p, response_format.
         chat_req = {
             "model": upstream_model,
             "messages": file_messages + clean_messages,
             "stream": stream_mode,
+            "thinking": {"type": "enabled"},
         }
-        if tools:
-            chat_req["tools"] = tools
-        # Always enable DeepSeek thinking mode
-        chat_req["thinking"] = {"type": "enabled"}
-        # Map reasoning effort: Codex "ultra" → DeepSeek "max" (DeepSeek doesn't support "ultra")
+        # Map reasoning effort: Codex "ultra" → DeepSeek "max"
         client_effort = (req.get("reasoning") or {}).get("effort", "max")
-        if client_effort == "ultra":
-            chat_req["reasoning_effort"] = "max"
-        elif client_effort in ("max", "high", "medium", "low", "minimal"):
-            chat_req["reasoning_effort"] = client_effort
-        else:
-            chat_req["reasoning_effort"] = "max"
-        # Request usage stats in streaming mode (for cache hit tracking)
+        chat_req["reasoning_effort"] = (
+            "max" if client_effort == "ultra" else
+            client_effort if client_effort in ("max", "high", "medium", "low", "minimal")
+            else "max"
+        )
+        chat_req["max_tokens"] = req.get("max_output_tokens") or 384000
         if stream_mode:
             chat_req["stream_options"] = {"include_usage": True}
         chat_req["tool_choice"] = req.get("tool_choice", "auto")
+
+        # Variable fields — appended after stable fields
+        if tools:
+            chat_req["tools"] = tools
         if req.get("response_format"):
             chat_req["response_format"] = req["response_format"]
         if req.get("temperature") is not None:
             chat_req["temperature"] = req["temperature"]
-        if req.get("max_output_tokens"):
-            chat_req["max_tokens"] = req["max_output_tokens"]
-        else:
-            chat_req["max_tokens"] = 384000  # default to avoid DeepSeek output truncation
         if req.get("top_p") is not None:
             chat_req["top_p"] = req["top_p"]
 
