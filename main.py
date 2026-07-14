@@ -39,6 +39,9 @@ def main():
             for f in self.files: f.write(s); f.flush()
         def flush(self):
             for f in self.files: f.flush()
+        def isatty(self): return False
+        def isatty(self):
+            return False
 
     sys.stdout = _Tee(sys.stdout, log_fh)
     sys.stderr = _Tee(sys.stderr, log_fh)
