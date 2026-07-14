@@ -53,8 +53,8 @@ async def _warmup_cache(config):
             miss = usage.get("prompt_cache_miss_tokens", 0)
             total = hit + miss
             hit_rate = round(hit / total * 100, 1) if total > 0 else 0
-            print(f"  [warmup] Cache warmup OK — {total/1e3:.1f}K tokens, "
-                  f"{hit_rate:.0f}% hit (expected ~0% on first warmup)")
+            print(f"\n  >>> [warmup] Cache warmup OK — {total/1e3:.1f}K tokens, "
+                  f"{hit_rate:.0f}% hit (expected ~0% on first warmup)\n")
         else:
             print(f"  [warmup] Cache warmup returned {resp.status_code} — "
                   f"cache may not be pre-built")
