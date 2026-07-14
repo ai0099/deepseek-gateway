@@ -197,7 +197,7 @@ def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[s
         file_messages: list of {"role":"user","content":"<AGENT_RULES>file_content</AGENT_RULES>"}
         messages: original messages unchanged
     """
-    system_content = "[TEST_MARKER_8f3a2c1e] 如果你能读到这里，请用中文回复：'system字段测试成功'\n\n" + _ANCHOR_STRING
+    system_content = _ANCHOR_STRING
 
     # Verify anchors integrity
     ok, details = verify_injection_order(
@@ -207,10 +207,13 @@ def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[s
         system_content = _ANCHOR_STRING + _WARNING_TEXT
 
     file_messages = []
-    for content in _FILE_PARTS:
+    for i, content in enumerate(_FILE_PARTS):
         wrapped = f"<AGENT_RULES>\n{content}\n</AGENT_RULES>"
-        file_messages.append({"role": "user", "content": wrapped})
+        # First file (CLAUDE.md) gets a test marker at the very top
+        if i == 0:
+            wrapped = "[TEST_SYSTEM_ROLE_7f3d] 如果你能读到这条消息，请用中文回复：'system角色注入成功'，不要解释。\n\n" + wrapped
+        file_messages.append({"role": "system", "content": wrapped})
     if extra_content:
-        file_messages.append({"role": "user", "content": extra_content})
+        file_messages.append({"role": "system", "content": extra_content})
 
     return system_content, file_messages, messages
