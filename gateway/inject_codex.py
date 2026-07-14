@@ -189,28 +189,30 @@ _WARNING_TEXT = (
 
 
 def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, list[dict], list[dict]]:
-    """Codex Chat Completions 前缀注入 — individual files as separate messages.
+    """Codex Chat Completions prefix injection — all rules merged into system field.
+
+    Merges anchors + all rule files + extra_content into a single system string,
+    matching the Claude route's approach for optimal DeepSeek KV cache hit rate.
 
     Returns:
         (system_content, file_messages, messages)
-        system_content: 26 anchors as string for top-level system field
-        file_messages: list of {"role":"user","content":"<AGENT_RULES>file_content</AGENT_RULES>"}
+        system_content: anchors + all AGENT_RULES files joined as one string
+        file_messages: always empty (all content merged into system_content)
         messages: original messages unchanged
     """
-    system_content = _ANCHOR_STRING
+    # Build system_content: anchors + all rule files + extra_content
+    parts = [_ANCHOR_STRING]
+    for content in _FILE_PARTS:
+        parts.append(f"<AGENT_RULES>\n{content}\n</AGENT_RULES>")
+    if extra_content:
+        parts.append(extra_content)
+    system_content = "\n\n".join(parts)
 
     # Verify anchors integrity
     ok, details = verify_injection_order(
         [{"role": "system", "content": _ANCHOR_STRING}] + messages
     )
     if not ok:
-        system_content = _ANCHOR_STRING + _WARNING_TEXT
+        system_content = _ANCHOR_STRING + _WARNING_TEXT + "\n\n" + system_content[len(_ANCHOR_STRING):]
 
-    file_messages = []
-    for content in _FILE_PARTS:
-        wrapped = f"<AGENT_RULES>\n{content}\n</AGENT_RULES>"
-        file_messages.append({"role": "system", "content": wrapped})
-    if extra_content:
-        file_messages.append({"role": "system", "content": extra_content})
-
-    return system_content, file_messages, messages
+    return system_content, [], messages
