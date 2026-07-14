@@ -1,6 +1,0 @@
-https://github.com/NewbieGameCoder/DeepSeekCache/blob/main/docs/dcache.md
-https://deepseekv4.wiki/en/tutorials/deepseek-v4-codex-integration
-https://doc.tokenpapa.ai/en/docs/blog/deepseek-cache-hit-optimization
-https://aicontenthacker.com/deepseek-api-cache-optimization-strategy/
-https://docs.bswen.com/blog/2026-06-05-deepseek-prompt-caching-98-percent/
-https://dev.to/codekingai/i-wired-deepseek-v4-into-claude-code-and-codex-cli-without-touching-the-tools-64d
