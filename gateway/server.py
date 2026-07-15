@@ -32,7 +32,6 @@ async def _warmup_cache(config):
                 "stream": False,
                 "max_tokens": 1,
                 "thinking": {"type": "enabled"},
-                "user_id": "codex-gw",
             },
             headers={
                 "Authorization": f"Bearer {config.deepseek_api_key}",

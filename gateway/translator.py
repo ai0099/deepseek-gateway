@@ -265,9 +265,6 @@ class ResponsesTranslator:
         if stream_mode:
             chat_req["stream_options"] = {"include_usage": True}
         chat_req["tool_choice"] = req.get("tool_choice", "auto")
-        # Deterministic user_id — pins all Codex requests to same DeepSeek cache pool
-        # (see DEEPSEEK_CACHE_GUIDE.md §3-F: cross-instance cache isolation)
-        chat_req["user_id"] = "codex-gw"
 
         # Variable fields — appended after stable fields
         if tools:
