@@ -197,24 +197,15 @@ _WARNING_TEXT = (
 )
 
 
-def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, list[dict], list[dict]]:
-    """Codex Chat Completions prefix injection — anchor + merged rules as two messages.
-
-    Returns two system messages in file_messages:
-      file_messages[0] = anchor (~1800 tokens) — for routing hash + minimum cache
-      file_messages[1] = merged rules (~60K tokens) — full rule files
-
-    DeepSeek routes based on hash of first ~256 tokens (within anchor).
-    Cache granularity is 128-token increments. Anchor is 14 cache blocks.
-    Minimum cacheable prefix is 1024 tokens — anchor exceeds this.
+def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[str, list[dict], list[dict], list[dict]]:
+    """Codex Chat Completions prefix injection.
 
     Returns:
-        (system_content, file_messages, messages)
-        system_content: always empty
-        file_messages: [anchor_msg, rules_msg]
-        messages: original messages unchanged
+        (system_content, file_messages, messages, tail_messages)
+        file_messages: [anchor, rules] — prepended, NEVER varies
+        tail_messages: [extra_content] if any — appended AFTER conversation
+                        so it never shifts the stable prefix positions
     """
-    # Verify anchors integrity
     ok, details = verify_injection_order(
         [{"role": "system", "content": _ANCHOR_BLOCK}] + messages
     )
@@ -222,17 +213,18 @@ def inject_prefix_chat(messages: list[dict], extra_content: str = "") -> tuple[s
     if not ok:
         anchor_text = _ANCHOR_BLOCK + _WARNING_TEXT
 
-    # Build merged rules: all rule files joined
     rules_parts = []
     for content in _FILE_PARTS:
         rules_parts.append(f"<AGENT_RULES>\n{content}\n</AGENT_RULES>")
-    if extra_content:
-        rules_parts.append(extra_content)
     rules_text = "\n\n".join(rules_parts)
 
-    # Two system messages: anchor first (for routing), rules second (for full context)
     file_messages = [
         {"role": "system", "content": anchor_text},
         {"role": "system", "content": rules_text},
     ]
-    return "", file_messages, messages
+
+    tail_messages = []
+    if extra_content:
+        tail_messages = [{"role": "system", "content": extra_content}]
+
+    return "", file_messages, messages, tail_messages

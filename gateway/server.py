@@ -23,7 +23,7 @@ async def _warmup_cache(config):
     # ── Codex route (Chat Completions endpoint) ──
     try:
         from .inject_codex import inject_prefix_chat
-        _, fm, _ = inject_prefix_chat([], "")
+        _, fm, _, _ = inject_prefix_chat([], "")
         resp = await client.post(
             config.chat_completions_endpoint,
             json={

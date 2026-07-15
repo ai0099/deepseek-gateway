@@ -235,7 +235,7 @@ class ResponsesTranslator:
         # Inject stable cache prefix as the first system message.
         # All rules (anchors + files) merged into ONE system message at messages[0].
         # DeepSeek Chat Completions does NOT support a top-level "system" field.
-        system_content, file_messages, messages = inject_prefix_chat(messages, app_instructions)
+        system_content, file_messages, messages, tail_messages = inject_prefix_chat(messages, app_instructions)
 
         # Normalize all messages to canonical JSON form so the same
         # semantic message produces the same token sequence across rounds.
@@ -250,7 +250,7 @@ class ResponsesTranslator:
         # Variable fields (may change): tools, temperature, top_p, response_format.
         chat_req = {
             "model": upstream_model,
-            "messages": file_messages + clean_messages,
+            "messages": file_messages + clean_messages + tail_messages,
             "stream": stream_mode,
             "thinking": {"type": "enabled"},
         }
