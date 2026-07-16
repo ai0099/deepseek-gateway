@@ -206,6 +206,12 @@ def _clean_anthropic_body(body: dict):
     """Apply safe limits, enforce max thinking effort, fix sub-agent conflicts,
     and inject stable KV-cache prefix into the system field.
 
+    Claude Code sends different system prompts for different model variants
+    (claude-fable-5 vs claude-fable-5[1m]). To share cache across both,
+    we isolate INJECTION as the sole system field, and move Claude's original
+    prompt into messages[0]. This way system_chars is always identical for
+    ALL model variants.
+
     NOTE: mutates body dict in-place.
     """
     if body.get("max_tokens", 0) > MAX_OUTPUT_TOKENS:
@@ -214,9 +220,13 @@ def _clean_anthropic_body(body: dict):
     _ensure_thinking_enabled(body)
     _enforce_max_effort(body)
 
-    # Inject stable anchors + all rule files into the system field so EVERY
-    # request (main agent + sub-agents) shares the same prefix for KV-cache.
-    body["system"] = inject_system_prefix(body.get("system"))
+    # Save Claude's original system prompt, set system = INJECTION only
+    original_system = body.get("system")
+    body["system"] = inject_system_prefix(None, verify=True)  # [INJECTION] only
+
+    # Move Claude original into messages[0] so Claude still sees it
+    if original_system:
+        body["messages"].insert(0, {"role": "user", "content": str(original_system)})
 
 
 def _enforce_max_effort(body: dict):
