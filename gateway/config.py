@@ -23,13 +23,9 @@ class Settings(BaseSettings):
     }
 
     # Responses API model mapping (OpenAI model → DeepSeek model)
-    # NOTE: [1m] suffix is a client-side convention indicating 1M context window.
-    # resolve_responses() strips it from the resolved model before sending to
-    # DeepSeek Chat Completions API (which does not support the suffix).
     responses_model_map: dict = {
         "gpt-5.5":                    "deepseek-chat",
         "gpt-5.6-sol":               "deepseek-v4-pro[1m]",
-        "gpt-5.6-sol[1m]":           "deepseek-v4-pro[1m]",
     }
 
     model_config = {"env_prefix": "DS_GW_", "env_file": ".env", "env_nested_delimiter": "__"}

@@ -26,13 +26,11 @@ class ModelMapper:
         # Reverse-only entries: upstream models that map to existing slots
         # (no forward slot — they share a client-facing name on return only)
         self._reverse["deepseek-v4-flash"] = "claude-fable-5[1m]"
-        # Reverse: deepseek name → first Codex model name (prefer [1m] versions)
+        # Reverse: deepseek name → first Codex model name
         self._reverse_responses: dict[str, str] = {}
         for codex_name, ds_name in self._responses_map.items():
             if ds_name not in self._reverse_responses:
                 self._reverse_responses[ds_name] = codex_name
-            elif "[1m]" in codex_name:
-                self._reverse_responses[ds_name] = codex_name  # prefer [1m]
 
     # ── Anthropic (Claude Desktop / Claude Code) ──
 
@@ -59,11 +57,11 @@ class ModelMapper:
                 "context_window": 1050000,
                 "max_output_tokens": 393216,
             })
-        # Codex model names from responses_map (prefer [1m] versions)
+        # Codex model names from responses_map
         models_by_base: dict[str, str] = {}
         for name in self._responses_map.keys():
             base = _strip_suffix(name)
-            if base not in models_by_base or "[1m]" in name:
+            if base not in models_by_base:
                 models_by_base[base] = name
         for base, name in models_by_base.items():
             if base in seen:
@@ -84,7 +82,7 @@ class ModelMapper:
         return {"object": "list", "data": data}
 
     def resolve_anthropic(self, client_model: str) -> str:
-        """claude-fable-5[1m] → deepseek-v4-pro[1m]. Exact match first, then stripped base."""
+        """claude-fable-5 → deepseek-v4-pro[1m]. Exact match first, then stripped base."""
         # Exact match (primary: client sends "claude-fable-5[1m]")
         if client_model in self._slot_map:
             return self._slot_map[client_model]
