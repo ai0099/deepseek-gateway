@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Claude models → real DeepSeek models (for Claude Desktop masquerade)
     model_slots: dict = {
-        "claude-fable-5[1m]":           "deepseek-v4-pro[1m]",
+        "claude-fable-5":              "deepseek-v4-pro[1m]",
     }
 
     # Responses API model mapping (OpenAI model → DeepSeek model)
