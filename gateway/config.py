@@ -24,7 +24,6 @@ class Settings(BaseSettings):
 
     # Responses API model mapping (OpenAI model → DeepSeek model)
     responses_model_map: dict = {
-        "gpt-5.5":                    "deepseek-chat",
         "gpt-5.6-sol":               "deepseek-v4-pro[1m]",
     }
 
