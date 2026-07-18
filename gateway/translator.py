@@ -78,6 +78,39 @@ def _normalize_messages(messages: list[dict]) -> list[dict]:
     return [_normalize_message(m) for m in messages]
 
 
+def _hoist_codex_system(messages: list[dict], prefix_count: int) -> list[dict]:
+    """Move Codex system messages from after gateway prefix to the tail.
+
+    Codex injects session-specific system messages (identity, permissions,
+    AGENTS.md, hook output) between the gateway prefix and the first real
+    user/tool message. These vary per session and prevent cross-session
+    cache reuse. Moving them to the tail shortens the stable prefix to
+    just gateway rules, maximizing cache hit rates across restarts.
+
+    Only system messages in a contiguous block immediately after the
+    gateway prefix are moved. Hook/system messages that appear later
+    in the conversation (e.g. C03 self-check, Tool check) stay in place.
+    """
+    if len(messages) <= prefix_count:
+        return messages
+
+    # Collect system messages after prefix, until first non-system
+    hoisted: list[dict] = []
+    split_at = prefix_count
+    for i in range(prefix_count, len(messages)):
+        if messages[i].get("role") == "system":
+            hoisted.append(messages[i])
+            split_at = i + 1
+        else:
+            break
+
+    if not hoisted:
+        return messages
+
+    # Return: [prefix, ...rest of conversation..., ...hoisted system msgs]
+    return messages[:prefix_count] + messages[split_at:] + hoisted
+
+
 class ResponseCache:
     """In-memory LRU cache for previous_response_id lookups. Uses OrderedDict for O(1) eviction."""
     def __init__(self, max_entries: int = 100):
@@ -240,6 +273,13 @@ class ResponsesTranslator:
         # Normalize all messages to canonical JSON form so the same
         # semantic message produces the same token sequence across rounds.
         messages = _normalize_messages(messages)
+
+        # Hoist Codex system messages to the tail so they don't
+        # pollute the stable prefix between gateway rules and user input.
+        # Codex system msgs ("You are Codex...", permissions, AGENTS.md, etc.)
+        # vary per session and sit between rules and user — moving them after
+        # the conversation keeps the prefix compact and cross-session stable.
+        messages = _hoist_codex_system(messages, len(file_messages))
 
         stream_mode = req.get("stream", False)
         clean_messages = _sanitize_content_types(messages)
