@@ -279,7 +279,8 @@ class ResponsesTranslator:
         # Codex system msgs ("You are Codex...", permissions, AGENTS.md, etc.)
         # vary per session and sit between rules and user — moving them after
         # the conversation keeps the prefix compact and cross-session stable.
-        messages = _hoist_codex_system(messages, len(file_messages))
+        # prefix_count=0 because messages doesn't include gateway prefix yet.
+        messages = _hoist_codex_system(messages, 0)
 
         stream_mode = req.get("stream", False)
         clean_messages = _sanitize_content_types(messages)
